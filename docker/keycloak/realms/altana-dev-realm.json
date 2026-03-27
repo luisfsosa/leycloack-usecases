@@ -1,0 +1,90 @@
+{
+  "realm": "altana-dev",
+  "displayName": "Altana Development",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "accessTokenLifespan": 300,
+  "ssoSessionMaxLifespan": 36000,
+  "refreshTokenMaxReuse": 0,
+  "clients": [
+    {
+      "clientId": "altana-web",
+      "name": "Altana Web App",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:3000/*"],
+      "webOrigins": ["http://localhost:3000"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "defaultClientScopes": ["openid", "profile", "email"],
+      "optionalClientScopes": ["address", "phone", "offline_access"]
+    },
+    {
+      "clientId": "supply-chain-backend",
+      "name": "Supply Chain Backend API",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "secret": "CHANGE-ME-IN-PRODUCTION",
+      "redirectUris": [],
+      "webOrigins": [],
+      "defaultClientScopes": ["openid"],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "python-fastapi",
+      "name": "Python FastAPI Service",
+      "enabled": true,
+      "publicClient": false,
+      "bearerOnly": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    }
+  ],
+  "roles": {
+    "realm": [
+      {"name": "ROLE_ADMIN", "description": "Administrador del sistema"},
+      {"name": "ROLE_USER", "description": "Usuario estándar"},
+      {"name": "ROLE_ANALYST", "description": "Analista de supply chain"}
+    ]
+  },
+  "users": [
+    {
+      "username": "admin-user",
+      "email": "admin@altana.dev",
+      "firstName": "Admin",
+      "lastName": "User",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{"type": "password", "value": "admin123", "temporary": false}],
+      "realmRoles": ["ROLE_ADMIN", "ROLE_USER"]
+    },
+    {
+      "username": "analyst-user",
+      "email": "analyst@altana.dev",
+      "firstName": "Supply",
+      "lastName": "Analyst",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{"type": "password", "value": "analyst123", "temporary": false}],
+      "realmRoles": ["ROLE_ANALYST", "ROLE_USER"]
+    }
+  ],
+  "smtpServer": {
+    "host": "mailhog",
+    "port": "1025",
+    "from": "keycloak@altana.dev",
+    "fromDisplayName": "Altana Platform",
+    "ssl": "false",
+    "starttls": "false",
+    "auth": "false"
+  }
+}
