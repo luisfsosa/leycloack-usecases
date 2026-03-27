@@ -64,7 +64,7 @@
       "lastName": "User",
       "enabled": true,
       "emailVerified": true,
-      "credentials": [{"type": "password", "value": "admin123", "temporary": false}],
+      "credentials": [{"type": "password", "value": " ", "temporary": false}],
       "realmRoles": ["ROLE_ADMIN", "ROLE_USER"]
     },
     {

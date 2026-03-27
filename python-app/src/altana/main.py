@@ -1,0 +1,64 @@
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from jose import jwt
+import httpx
+
+from altana.routers import supply_chain
+from altana.config import settings
+
+app = FastAPI(title="Altana Supply Chain API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(supply_chain.router)
+
+
+@app.get("/")
+async def root():
+    return {"service": "Altana Supply Chain API", "docs": "/docs"}
+
+
+@app.get("/debug/token")
+async def debug_token(request: Request):
+    """Endpoint temporal de debug — REMOVER en produccion."""
+    auth = request.headers.get("authorization", "")
+    if not auth.startswith("Bearer "):
+        return {"error": "no bearer token"}
+
+    token = auth[7:]  # quitar "Bearer "
+
+    header = jwt.get_unverified_header(token)
+    jwks = httpx.get(settings.jwks_uri).json()
+    kids_in_jwks = [k["kid"] for k in jwks.get("keys", [])]
+
+    try:
+        payload = jwt.decode(
+            token, jwks, algorithms=["RS256"],
+            options={"verify_aud": False, "verify_iss": False}
+        )
+        return {
+            "token_kid": header.get("kid"),
+            "jwks_kids": kids_in_jwks,
+            "kid_found": header.get("kid") in kids_in_jwks,
+            "decode_ok": True,
+            "username": payload.get("preferred_username"),
+            "roles": payload.get("realm_access", {}).get("roles", []),
+            "token_len": len(token),
+            "token_last_chars": repr(token[-10:]),
+        }
+    except Exception as e:
+        return {
+            "token_kid": header.get("kid"),
+            "jwks_kids": kids_in_jwks,
+            "kid_found": header.get("kid") in kids_in_jwks,
+            "decode_ok": False,
+            "error": str(e),
+            "token_len": len(token),
+            "token_last_chars": repr(token[-10:]),
+        }
