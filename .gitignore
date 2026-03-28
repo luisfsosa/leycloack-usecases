@@ -35,6 +35,11 @@ bin/
 *.secret
 **/application-local.properties
 **/application-local.yml
+scripts/.last_access_token
+
+### IDE ###
+.idea/
+.claude/settings.local.json
 
 ### Docker volumes ###
 docker/postgres-data/
