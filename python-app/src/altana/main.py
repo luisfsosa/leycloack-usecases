@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from jose import jwt
+import jwt as pyjwt
 import httpx
 
 from altana.routers import supply_chain
@@ -37,14 +37,16 @@ async def debug_token(request: Request):
 
     token = auth[7:]  # quitar "Bearer "
 
-    header = jwt.get_unverified_header(token)
+    header = pyjwt.get_unverified_header(token)
     jwks = httpx.get(settings.jwks_uri).json()
     kids_in_jwks = [k["kid"] for k in jwks.get("keys", [])]
 
     try:
-        payload = jwt.decode(
-            token, jwks, algorithms=["RS256"],
-            options={"verify_aud": False, "verify_iss": False}
+        from jwt import PyJWKClient
+        signing_key = PyJWKClient(settings.jwks_uri).get_signing_key_from_jwt(token)
+        payload = pyjwt.decode(
+            token, signing_key.key, algorithms=["RS256"],
+            options={"verify_aud": False}
         )
         return {
             "token_kid": header.get("kid"),
