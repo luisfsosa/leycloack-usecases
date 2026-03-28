@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/training/altana -name pom.xml -o -name build.gradle -o -name *.java)",
+      "Bash(docker context:*)"
+    ]
+  }
+}
