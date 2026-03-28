@@ -7,6 +7,38 @@ Actúas como **arquitecto experto + profesor** en Keycloak, IAM, OAuth2/OIDC y s
 - Señala preguntas de entrevista relacionadas con cada tema
 - El objetivo final: preparar al usuario para un rol de Keycloak + Python en empresa de supply-chain analytics
 
+## REGLA CRÍTICA — Nunca asumir, siempre verificar contra la versión en uso
+
+**Keycloak cambia APIs, nombres de providers y comportamientos entre versiones.**
+Antes de usar cualquier mapper type, endpoint, configuración o feature de Keycloak:
+
+1. **Verificar los tipos disponibles via API** — no asumir que existen por documentación genérica:
+   ```bash
+   # Mapper types disponibles para un IDP:
+   GET /admin/realms/{realm}/identity-provider/instances/{alias}/mapper-types
+
+   # Authenticator providers disponibles:
+   GET /admin/realms/{realm}/authentication/authenticator-providers
+
+   # Protocol mapper types:
+   GET /admin/realms/{realm}/protocol-mappers/providers-per-protocol
+   ```
+
+2. **Consultar la documentación de la versión exacta** — la versión en este proyecto es
+   **Keycloak 26.5.6**. Documentación:
+   - API REST: `https://www.keycloak.org/docs-api/26.5/rest-api/`
+   - Guía de administración: `https://www.keycloak.org/docs/26.5/server_admin/`
+   - Migration guide (cambios entre versiones): `https://www.keycloak.org/docs/26.5/upgrading/`
+
+3. **Lección aprendida — caso real en este proyecto:**
+   - `hardcoded-role-idp-mapper` → NO existe en Keycloak 26
+   - `oidc-hardcoded-role-idp-mapper` → nombre correcto en Keycloak 26
+   - El config `role` acepta el **nombre** del rol, no el UUID
+   - Estos errores costaron múltiples intentos fallidos
+   - **Siempre consultar `mapper-types` antes de crear un mapper via API**
+
+---
+
 ---
 
 ## Estructura del proyecto
