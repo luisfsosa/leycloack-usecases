@@ -10,7 +10,11 @@ app = FastAPI(title="Altana Supply Chain API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",   # React CRA / Next.js
+        "http://localhost:5173",   # Vite dev server
+        "http://localhost:5174",   # Vite segundo puerto (fallback)
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
