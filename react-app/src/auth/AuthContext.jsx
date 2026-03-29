@@ -94,11 +94,11 @@ export function AuthProvider({ children }) {
 
   /**
    * Starts the PKCE login flow and redirects to Keycloak.
-   * idpHint (optional): if provided, Keycloak skips the login screen and sends
-   * the user directly to the matching Identity Provider (kc_idp_hint param).
-   * Used by Pattern 2 — Email domain discovery in HomePage.
+   * idpHint:   kc_idp_hint — skip Keycloak login, go directly to the IdP.
+   * loginHint: login_hint  — pre-fill the email/username field in Keycloak
+   *            (and in the external IdP when kc_idp_hint is set).
    */
-  const login = useCallback(async (idpHint = null) => {
+  const login = useCallback(async (idpHint = null, loginHint = null) => {
     const verifier   = generateCodeVerifier();
     const challenge  = await generateCodeChallenge(verifier);
     const state      = generateState();
@@ -106,7 +106,7 @@ export function AuthProvider({ children }) {
     sessionStorage.setItem('pkce_verifier', verifier);
     sessionStorage.setItem('pkce_state', state);
 
-    await startLogin(challenge, state, idpHint);
+    await startLogin(challenge, state, idpHint, loginHint);
   }, []);
 
   /**

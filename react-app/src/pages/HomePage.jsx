@@ -55,15 +55,13 @@ export default function HomePage() {
   function handleSubmit(e) {
     e.preventDefault();
     const hint = getIdpHint(email);
-    // hint = 'toyota-corp'  → Keycloak redirects directly to Toyota SSO
-    // hint = null           → Keycloak shows its own login page
-    login(hint);
+    // idpHint  = 'toyota-corp' → skip Keycloak, go directly to Toyota SSO
+    // idpHint  = null          → show Keycloak login page
+    // loginHint = email        → pre-fill the username/email field everywhere
+    login(hint, email);
   }
 
-  const hint    = getIdpHint(email);
-  const idpName = hint
-    ? DOMAIN_IDP_MAP[email.split('@')[1]?.toLowerCase()] && email.split('@')[1]
-    : null;
+  const hint = getIdpHint(email);
 
   return (
     <div style={{ textAlign: 'center', marginTop: '15%', fontFamily: 'monospace' }}>

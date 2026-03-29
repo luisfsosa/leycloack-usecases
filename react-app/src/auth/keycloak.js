@@ -36,12 +36,19 @@ export const endpoints = {
  *   Si usáramos localStorage, el verifier podría persistir indefinidamente.
  */
 /**
- * idpHint (optional): if provided, adds kc_idp_hint=<alias> to skip the
- * Keycloak login screen and go directly to the specified Identity Provider.
- * Pattern 2 — Email domain discovery: derive the hint from the email domain
- * before calling this function.
+ * idpHint (optional): adds kc_idp_hint=<alias> to skip the Keycloak login
+ * screen and go directly to the specified Identity Provider.
+ *
+ * loginHint (optional): adds login_hint=<email> so Keycloak (and the external
+ * IdP when kc_idp_hint is set) pre-fills the username/email field.
+ * The user typed the email once in React — they should not have to type it again.
+ *
+ * INTERVIEW: "How do you avoid asking the user to type their email twice?"
+ * → Pass login_hint=<email> in the authorization URL. Keycloak pre-fills its
+ *   own login form, and automatically forwards the hint to the external IdP
+ *   when kc_idp_hint is also set (OIDC standard: login_hint is forwarded).
  */
-export async function startLogin(codeChallenge, state, idpHint = null) {
+export async function startLogin(codeChallenge, state, idpHint = null, loginHint = null) {
   const params = new URLSearchParams({
     client_id:             CLIENT_ID,
     response_type:         'code',
@@ -52,9 +59,8 @@ export async function startLogin(codeChallenge, state, idpHint = null) {
     state,
   });
 
-  if (idpHint) {
-    params.set('kc_idp_hint', idpHint);
-  }
+  if (idpHint)    params.set('kc_idp_hint', idpHint);
+  if (loginHint)  params.set('login_hint',  loginHint);
 
   window.location.href = `${endpoints.auth}?${params}`;
 }
