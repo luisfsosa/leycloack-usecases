@@ -1,11 +1,11 @@
-# Keycloak Admin REST API — Referencia práctica
+# Keycloak Admin REST API — Practical Reference
 
-> La Admin API es como manejas Keycloak desde código: CI/CD, scripts de onboarding,
-> automatización de configuración. En el rol de Keycloak engineer la usarás constantemente.
+> The Admin API is how you manage Keycloak from code: CI/CD, onboarding scripts,
+> configuration automation. As a Keycloak engineer you will use it constantly.
 
-## Autenticación — obtener Admin Token
+## Authentication — get an Admin Token
 
-Todo comienza aquí. El realm `master` tiene el cliente `admin-cli`.
+Everything starts here. The `master` realm has the `admin-cli` client.
 
 ```bash
 ADMIN_TOKEN=$(curl -s -X POST \
@@ -15,23 +15,23 @@ ADMIN_TOKEN=$(curl -s -X POST \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 ```
 
-> ENTREVISTA: "¿Por qué usas el realm master para el admin token?"
-> → El realm master es el realm de administración de Keycloak. Tiene el service account
->   admin-cli con permisos de superadmin. En producción deberías usar un service account
->   con permisos mínimos necesarios (principle of least privilege).
+> **INTERVIEW:** "Why do you use the master realm for the admin token?"
+> → The master realm is Keycloak's administration realm. It has the admin-cli
+>   service account with superadmin permissions. In production you should use a
+>   service account with least-privilege permissions.
 
 ---
 
 ## REALMS
 
-### Crear realm
+### Create realm
 ```bash
 curl -s -X POST "$KC/admin/realms" \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "realm": "mi-realm",
-    "displayName": "Mi Realm",
+    "realm": "my-realm",
+    "displayName": "My Realm",
     "enabled": true,
     "sslRequired": "external",
     "accessTokenLifespan": 300,
@@ -39,13 +39,13 @@ curl -s -X POST "$KC/admin/realms" \
   }'
 ```
 
-### Leer configuración de un realm
+### Read realm configuration
 ```bash
 curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
   "$KC/admin/realms/altana-dev" | python3 -m json.tool
 ```
 
-### Actualizar realm (PATCH parcial)
+### Update realm (partial PUT)
 ```bash
 curl -s -X PUT "$KC/admin/realms/altana-dev" \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
@@ -53,15 +53,15 @@ curl -s -X PUT "$KC/admin/realms/altana-dev" \
   -d '{"accessTokenLifespan": 300, "accessCodeLifespan": 300}'
 ```
 
-### Exportar realm completo
+### Export full realm
 ```bash
-# Via endpoint de exportación (incluye usuarios, clientes, roles)
+# Via export endpoint (includes users, clients, roles)
 curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
   "$KC/admin/realms/altana-dev/partial-export?exportClients=true&exportGroupsAndRoles=true" \
   | python3 -m json.tool > altana-dev-export.json
 ```
 
-### Eliminar realm
+### Delete realm
 ```bash
 curl -s -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" \
   "$KC/admin/realms/altana-dev"
@@ -69,28 +69,28 @@ curl -s -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" \
 
 ---
 
-## USUARIOS
+## USERS
 
-### Listar usuarios
+### List users
 ```bash
 curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
   "$KC/admin/realms/altana-dev/users" | python3 -m json.tool
 
-# Con filtros
+# With filters
 curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
   "$KC/admin/realms/altana-dev/users?search=john&max=10"
 ```
 
-### Crear usuario
+### Create user
 ```bash
 curl -s -X POST "$KC/admin/realms/altana-dev/users" \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "username": "nuevo-usuario",
-    "email": "nuevo@empresa.com",
-    "firstName": "Juan",
-    "lastName": "Pérez",
+    "username": "new-user",
+    "email": "new@company.com",
+    "firstName": "John",
+    "lastName": "Smith",
     "enabled": true,
     "emailVerified": true,
     "attributes": {
@@ -100,43 +100,43 @@ curl -s -X POST "$KC/admin/realms/altana-dev/users" \
   }'
 ```
 
-### Reset de password
+### Reset password
 ```bash
-USER_ID="uuid-del-usuario"
+USER_ID="user-uuid"
 
 curl -s -X PUT "$KC/admin/realms/altana-dev/users/$USER_ID/reset-password" \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"type": "password", "value": "nueva-password", "temporary": false}'
+  -d '{"type": "password", "value": "new-password", "temporary": false}'
 ```
 
-### Obtener usuario por username
+### Get user by username
 ```bash
 curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
   "$KC/admin/realms/altana-dev/users?username=admin-user&exact=true" \
   | python3 -c "import sys,json; users=json.load(sys.stdin); print(users[0]['id'] if users else 'not found')"
 ```
 
-### Asignar roles a usuario
+### Assign roles to user
 ```bash
-# Primero obtener los role objects
+# First get the role objects
 ROLE=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
   "$KC/admin/realms/altana-dev/roles/ROLE_ANALYST" | python3 -m json.tool)
 
-# Asignar
+# Assign
 curl -s -X POST "$KC/admin/realms/altana-dev/users/$USER_ID/role-mappings/realm" \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d "[$ROLE]"
 ```
 
-### Ver sesiones activas de un usuario
+### View active sessions for a user
 ```bash
 curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
   "$KC/admin/realms/altana-dev/users/$USER_ID/sessions" | python3 -m json.tool
 ```
 
-### Forzar logout de un usuario (invalida todas sus sesiones)
+### Force logout a user (invalidates all sessions)
 ```bash
 curl -s -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
   "$KC/admin/realms/altana-dev/users/$USER_ID/logout"
@@ -144,44 +144,44 @@ curl -s -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
 
 ---
 
-## CLIENTES
+## CLIENTS
 
-### Listar clientes
+### List clients
 ```bash
 curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
   "$KC/admin/realms/altana-dev/clients" \
   | python3 -c "import sys,json; [print(c['clientId'], '|', c['id']) for c in json.load(sys.stdin)]"
 ```
 
-### Obtener ID interno de un cliente por clientId
+### Get internal client ID by clientId
 ```bash
 CLIENT_UUID=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
   "$KC/admin/realms/altana-dev/clients?clientId=altana-web" \
   | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['id'])")
 ```
 
-### Crear cliente confidencial (backend)
+### Create confidential client (backend)
 ```bash
 curl -s -X POST "$KC/admin/realms/altana-dev/clients" \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "clientId": "mi-api",
+    "clientId": "my-api",
     "publicClient": false,
-    "secret": "mi-secret",
+    "secret": "my-secret",
     "standardFlowEnabled": false,
     "serviceAccountsEnabled": true,
     "directAccessGrantsEnabled": false
   }'
 ```
 
-### Crear cliente público con PKCE (SPA)
+### Create public client with PKCE (SPA)
 ```bash
 curl -s -X POST "$KC/admin/realms/altana-dev/clients" \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "clientId": "mi-spa",
+    "clientId": "my-spa",
     "publicClient": true,
     "standardFlowEnabled": true,
     "directAccessGrantsEnabled": false,
@@ -191,20 +191,20 @@ curl -s -X POST "$KC/admin/realms/altana-dev/clients" \
   }'
 ```
 
-### Agregar scope a un cliente
+### Add scope to a client
 ```bash
-# Obtener ID del scope
+# Get scope ID
 SCOPE_ID=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
   "$KC/admin/realms/altana-dev/client-scopes" \
   | python3 -c "import sys,json; print(next(s['id'] for s in json.load(sys.stdin) if s['name']=='roles'))")
 
-# Agregar como default scope
+# Add as default scope
 curl -s -X PUT \
   "$KC/admin/realms/altana-dev/clients/$CLIENT_UUID/default-client-scopes/$SCOPE_ID" \
   -H "Authorization: Bearer $ADMIN_TOKEN"
 ```
 
-### Rotar secret de un cliente
+### Rotate client secret
 ```bash
 curl -s -X POST \
   "$KC/admin/realms/altana-dev/clients/$CLIENT_UUID/client-secret" \
@@ -215,29 +215,29 @@ curl -s -X POST \
 
 ## IDENTITY PROVIDERS (B2B)
 
-### Listar IDPs registrados
+### List registered IDPs
 ```bash
 curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
   "$KC/admin/realms/altana-dev/identity-provider/instances" \
   | python3 -c "import sys,json; [print(i['alias'], i['providerId']) for i in json.load(sys.stdin)]"
 ```
 
-### Registrar IDP OIDC externo
+### Register an external OIDC IDP
 ```bash
 curl -s -X POST "$KC/admin/realms/altana-dev/identity-provider/instances" \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "alias": "empresa-idp",
-    "displayName": "Login con Empresa",
+    "alias": "company-idp",
+    "displayName": "Login with Company",
     "providerId": "oidc",
     "enabled": true,
     "trustEmail": true,
     "config": {
-      "issuer": "https://idp.empresa.com/realms/empresa",
-      "authorizationUrl": "https://idp.empresa.com/realms/empresa/protocol/openid-connect/auth",
-      "tokenUrl": "https://idp.empresa.com/realms/empresa/protocol/openid-connect/token",
-      "jwksUrl": "https://idp.empresa.com/realms/empresa/protocol/openid-connect/certs",
+      "issuer": "https://idp.company.com/realms/company",
+      "authorizationUrl": "https://idp.company.com/realms/company/protocol/openid-connect/auth",
+      "tokenUrl": "https://idp.company.com/realms/company/protocol/openid-connect/token",
+      "jwksUrl": "https://idp.company.com/realms/company/protocol/openid-connect/certs",
       "clientId": "altana-broker",
       "clientSecret": "secret",
       "defaultScope": "openid profile email",
@@ -248,17 +248,17 @@ curl -s -X POST "$KC/admin/realms/altana-dev/identity-provider/instances" \
   }'
 ```
 
-### Agregar mapper de rol a un IDP
+### Add role mapper to an IDP
 ```bash
-# Todos los usuarios de este IDP reciben ROLE_ANALYST automáticamente
+# All users from this IDP automatically receive ROLE_ANALYST
 curl -s -X POST \
-  "$KC/admin/realms/altana-dev/identity-provider/instances/empresa-idp/mappers" \
+  "$KC/admin/realms/altana-dev/identity-provider/instances/company-idp/mappers" \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "assign analyst role",
     "identityProviderMapper": "oidc-role-idp-mapper",
-    "identityProviderAlias": "empresa-idp",
+    "identityProviderAlias": "company-idp",
     "config": {"syncMode": "INHERIT", "role": "ROLE_ANALYST"}
   }'
 ```
@@ -267,14 +267,14 @@ curl -s -X POST \
 
 ## TOKENS
 
-### Introspección (verificar si un token es válido)
+### Introspection (verify if a token is valid)
 ```bash
 curl -s -X POST "$KC/realms/altana-dev/protocol/openid-connect/token/introspect" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -u "supply-chain-backend:CHANGE-ME-IN-PRODUCTION" \
   -d "token=$ACCESS_TOKEN" | python3 -m json.tool
-# "active": true  → válido
-# "active": false → expirado o inválido
+# "active": true  → valid
+# "active": false → expired or invalid
 ```
 
 ### Client Credentials (service-to-service)
@@ -284,7 +284,7 @@ curl -s -X POST "$KC/realms/altana-dev/protocol/openid-connect/token" \
   -d "grant_type=client_credentials&client_id=supply-chain-backend&client_secret=SECRET"
 ```
 
-### Revocar refresh token
+### Revoke refresh token
 ```bash
 curl -s -X POST "$KC/realms/altana-dev/protocol/openid-connect/revoke" \
   -H "Content-Type: application/x-www-form-urlencoded" \
@@ -293,7 +293,7 @@ curl -s -X POST "$KC/realms/altana-dev/protocol/openid-connect/revoke" \
 
 ---
 
-## Variables de entorno útiles para scripting
+## Useful environment variables for scripting
 
 ```bash
 KC="http://localhost:8080"
@@ -304,7 +304,7 @@ ADMIN_TOKEN=$(curl -s -X POST "$KC/realms/master/protocol/openid-connect/token" 
   -d "client_id=admin-cli&grant_type=password&username=admin&password=admin" \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 
-# A partir de aquí todas las llamadas usan:
+# From here all calls use:
 # -H "Authorization: Bearer $ADMIN_TOKEN"
-# URL base: $KC/admin/realms/$REALM/...
+# Base URL: $KC/admin/realms/$REALM/...
 ```

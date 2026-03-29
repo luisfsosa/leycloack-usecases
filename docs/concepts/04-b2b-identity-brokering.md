@@ -1,74 +1,74 @@
-# Patrón B2B — Identity Brokering con Keycloak
+# B2B Pattern — Identity Brokering with Keycloak
 
-> **Escenario:** Una empresa cliente (ej: Toyota) tiene su propio IdP.
-> Sus empleados deben acceder a Altana **sin crear nuevas credenciales**.
-> Keycloak actúa como **broker**: acepta el login del IdP externo y emite
-> sus propios tokens para la aplicación Altana.
+> **Scenario:** A client company (e.g. Toyota) has its own IdP.
+> Their employees must access Altana **without creating new credentials**.
+> Keycloak acts as a **broker**: accepts the login from the external IdP and
+> issues its own tokens for the Altana application.
 
 ---
 
-## ¿Qué es Identity Brokering?
+## What is Identity Brokering?
 
 ```
-Usuario Toyota           Keycloak altana-dev         Toyota IDP
+Toyota User              Keycloak altana-dev         Toyota IDP
       │                         │                         │
       │── click "Login Toyota" ─►│                         │
       │                         │── redirect auth request ►│
       │◄── redirect to Toyota ──│                         │
       │                                                   │
-      │── login toyota123 ────────────────────────────────►│
+      │── login credentials ──────────────────────────────►│
       │◄── authorization code ───────────────────────────── │
       │                                                   │
       │── code ────────────────►│                         │
       │                         │── exchange code ────────►│
       │                         │◄── id_token + access ───│
       │                         │                         │
-      │                         │ [IDP mappers ejecutados]│
+      │                         │ [IDP mappers executed]  │
       │                         │ → email: john@toyota.com│
       │                         │ → role: ROLE_ANALYST    │
       │                         │                         │
       │◄── Altana tokens ───────│                         │
 ```
 
-**Keycloak resuelve:**
-- Autenticación delegada al IdP externo
-- Traducción de identidad (claims del IDP → claims Altana)
-- Asignación automática de roles según el IDP de origen
-- Una sola sesión SSO en Altana aunque el user autentique en Toyota
+**Keycloak handles:**
+- Delegated authentication to the external IdP
+- Identity translation (IdP claims → Altana claims)
+- Automatic role assignment based on the source IdP
+- A single SSO session in Altana even though the user authenticated at Toyota
 
 ---
 
-## Conceptos clave
+## Key concepts
 
 ### syncMode: IMPORT vs FORCE
 
-| Modo | Comportamiento |
-|------|---------------|
-| `IMPORT` | Copia atributos del IDP **solo en el primer login** (creación de usuario en Altana) |
-| `FORCE`  | Sobreescribe atributos en **cada login** desde el IDP (sync continuo) |
+| Mode | Behavior |
+|------|---------|
+| `IMPORT` | Copies attributes from the IdP **only on first login** (user creation in Altana) |
+| `FORCE`  | Overwrites attributes on **every login** from the IdP (continuous sync) |
 
-> ENTREVISTA: "¿Cuándo usarías FORCE vs IMPORT?"
-> → FORCE cuando el IDP es la fuente de verdad (nombre, email corporativo, roles).
->   IMPORT cuando Altana puede modificar atributos localmente después del primer login.
+> **INTERVIEW:** "When would you use FORCE vs IMPORT?"
+> → FORCE when the IdP is the source of truth (name, corporate email, roles).
+>   IMPORT when Altana can modify attributes locally after the first login.
 
 ### kc_idp_hint
 
-Parámetro que le dice a Keycloak **qué IDP usar directamente**, saltándose la
-pantalla de selección de IDP.
+Parameter that tells Keycloak **which IDP to use directly**, skipping the
+IDP selection screen.
 
 ```
 &kc_idp_hint=toyota-corp
 ```
 
-> En un portal B2B con subdominio por empresa:
-> `toyota.altana.com` → siempre añade `kc_idp_hint=toyota-corp`
-> `ford.altana.com`   → siempre añade `kc_idp_hint=ford-corp`
+> In a B2B portal with per-company subdomain:
+> `toyota.altana.com` → always adds `kc_idp_hint=toyota-corp`
+> `ford.altana.com`   → always adds `kc_idp_hint=ford-corp`
 
 ---
 
-## Setup completo — paso a paso con Admin API
+## Full setup — step by step with Admin API
 
-### 1. Crear el realm "toyota-corp" (simula el IdP externo)
+### 1. Create the "toyota-corp" realm (simulates the external IdP)
 
 ```bash
 KC="http://localhost:8080"
@@ -89,7 +89,7 @@ curl -s -X POST "$KC/admin/realms" \
   }'
 ```
 
-### 2. Crear usuario de prueba en toyota-corp
+### 2. Create test user in toyota-corp
 
 ```bash
 curl -s -X POST "$KC/admin/realms/toyota-corp/users" \
@@ -104,21 +104,21 @@ curl -s -X POST "$KC/admin/realms/toyota-corp/users" \
     "emailVerified": true
   }'
 
-# Obtener su ID
+# Get user ID
 TOYOTA_USER_ID=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
   "$KC/admin/realms/toyota-corp/users?username=john.doe&exact=true" \
   | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['id'])")
 
-# Asignar password
+# Set password
 curl -s -X PUT "$KC/admin/realms/toyota-corp/users/$TOYOTA_USER_ID/reset-password" \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"type": "password", "value": "toyota123", "temporary": false}'
+  -d '{"type": "password", "value": "Test1234!", "temporary": false}'
 ```
 
-### 3. Crear cliente altana-broker en toyota-corp
+### 3. Create altana-broker client in toyota-corp
 
-Este cliente representa a Altana como consumer del IdP Toyota.
+This client represents Altana as a consumer of the Toyota IdP.
 
 ```bash
 curl -s -X POST "$KC/admin/realms/toyota-corp/clients" \
@@ -133,11 +133,11 @@ curl -s -X POST "$KC/admin/realms/toyota-corp/clients" \
   }'
 ```
 
-> El `redirectUri` es el endpoint del broker de Keycloak:
+> The `redirectUri` is the Keycloak broker endpoint:
 > `/realms/{consumer-realm}/broker/{idp-alias}/endpoint`
-> Keycloak lo genera automáticamente al registrar el IDP.
+> Keycloak generates this automatically when you register the IDP.
 
-### 4. Registrar toyota-corp como IDP en altana-dev
+### 4. Register toyota-corp as an IDP in altana-dev
 
 ```bash
 curl -s -X POST "$KC/admin/realms/altana-dev/identity-provider/instances" \
@@ -145,7 +145,7 @@ curl -s -X POST "$KC/admin/realms/altana-dev/identity-provider/instances" \
   -H "Content-Type: application/json" \
   -d '{
     "alias": "toyota-corp",
-    "displayName": "Login con Toyota",
+    "displayName": "Login with Toyota",
     "providerId": "oidc",
     "enabled": true,
     "trustEmail": true,
@@ -164,9 +164,9 @@ curl -s -X POST "$KC/admin/realms/altana-dev/identity-provider/instances" \
   }'
 ```
 
-### 5. Agregar mappers al IDP
+### 5. Add mappers to the IDP
 
-#### Mapper de email (sync email del IDP → Altana)
+#### Email mapper (sync email from IdP → Altana)
 ```bash
 curl -s -X POST \
   "$KC/admin/realms/altana-dev/identity-provider/instances/toyota-corp/mappers" \
@@ -184,7 +184,7 @@ curl -s -X POST \
   }'
 ```
 
-#### Mapper de rol (todos los usuarios Toyota → ROLE_ANALYST)
+#### Role mapper (all Toyota users → ROLE_ANALYST)
 ```bash
 curl -s -X POST \
   "$KC/admin/realms/altana-dev/identity-provider/instances/toyota-corp/mappers" \
@@ -203,43 +203,43 @@ curl -s -X POST \
 
 ---
 
-## Probar el flujo B2B completo
+## Testing the full B2B flow
 
-### Paso 1 — Generar URL PKCE con kc_idp_hint
+### Step 1 — Generate PKCE URL with kc_idp_hint
 
 ```bash
-# Usar el script incluido en el proyecto:
+# Use the script included in the project:
 python scripts/generate_b2b_url.py
 ```
 
-El script genera:
-- `code_verifier` y `code_challenge` (PKCE S256)
-- `state` para anti-CSRF
-- URL completa con **todos** los parámetros incluyendo `code_challenge_method=S256`
+The script generates:
+- `code_verifier` and `code_challenge` (PKCE S256)
+- `state` for anti-CSRF
+- Complete URL with **all** parameters including `code_challenge_method=S256`
 
-### Paso 2 — Iniciar servidor de captura
+### Step 2 — Start capture server
 
 ```bash
-# Terminal separado:
+# In a separate terminal:
 python scripts/capture_callback.py
 ```
 
-### Paso 3 — Abrir el URL en el browser
+### Step 3 — Open the URL in the browser
 
-El flow automático:
-1. Browser → Keycloak altana-dev (con `kc_idp_hint=toyota-corp`)
-2. Keycloak **no muestra** pantalla de selección de IDP
-3. Redirect inmediato → Keycloak toyota-corp login page
-4. Usuario: `john.doe` / `toyota123`
-5. Toyota-corp emite code → Keycloak altana-dev lo intercambia
-6. Mappers ejecutados: email + ROLE_ANALYST asignado
-7. Altana-dev emite su propio code → redirect a `localhost:3000/callback`
-8. Servidor de captura muestra el `code`
+The automatic flow:
+1. Browser → Keycloak altana-dev (with `kc_idp_hint=toyota-corp`)
+2. Keycloak **does not show** the IDP selection screen
+3. Immediate redirect → Keycloak toyota-corp login page
+4. User: `john.doe` / `Test1234!`
+5. toyota-corp issues code → Keycloak altana-dev exchanges it
+6. Mappers executed: email + ROLE_ANALYST assigned
+7. altana-dev issues its own code → redirects to `localhost:3000/callback`
+8. Capture server shows the `code`
 
-### Paso 4 — Exchange code → tokens
+### Step 4 — Exchange code → tokens
 
 ```bash
-CODE=<code capturado>
+CODE=<captured code>
 
 curl -s -X POST "http://localhost:8080/realms/altana-dev/protocol/openid-connect/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
@@ -247,21 +247,20 @@ curl -s -X POST "http://localhost:8080/realms/altana-dev/protocol/openid-connect
   -d "client_id=altana-web" \
   -d "redirect_uri=http://localhost:3000/callback" \
   -d "code=$CODE" \
-  -d "code_verifier=<verifier del script>" \
+  -d "code_verifier=<verifier from script>" \
   | python3 -m json.tool
 ```
 
-### Paso 5 — Verificar el token Altana
+### Step 5 — Verify the Altana token
 
 ```bash
-# Decodificar el access_token (sin verificar firma — solo ver claims)
-ACCESS_TOKEN="<token del paso anterior>"
+ACCESS_TOKEN="<token from previous step>"
 
 echo $ACCESS_TOKEN | cut -d'.' -f2 | \
   python3 -c "import sys,base64,json; d=sys.stdin.read().strip(); d+='='*(4-len(d)%4); print(json.dumps(json.loads(base64.urlsafe_b64decode(d)), indent=2))"
 ```
 
-**Debes ver en el payload:**
+**Expected payload:**
 ```json
 {
   "preferred_username": "john.doe",
@@ -273,53 +272,53 @@ echo $ACCESS_TOKEN | cut -d'.' -f2 | \
 }
 ```
 
-> El issuer es `altana-dev` — no `toyota-corp`. Keycloak emitió sus propios tokens.
-> El usuario se federó pero el token es 100% Altana.
+> The issuer is `altana-dev` — not `toyota-corp`. Keycloak issued its own tokens.
+> The user was federated but the token is 100% Altana.
 
 ---
 
-## Lo que el Python backend ve
+## What the Python backend sees
 
 ```bash
-# Llamar a /supply-chain/shipments con el token del usuario Toyota
+# Call /supply-chain/shipments with the Toyota user's token
 curl -s -H "Authorization: Bearer $ACCESS_TOKEN" \
-  "http://localhost:8003/supply-chain/shipments" | python3 -m json.tool
+  "http://localhost:8002/supply-chain/shipments" | python3 -m json.tool
 ```
 
-FastAPI valida:
-1. Firma → JWKS de `altana-dev` (no de toyota-corp)
+FastAPI validates:
+1. Signature → JWKS from `altana-dev` (not from toyota-corp)
 2. Issuer → `http://localhost:8080/realms/altana-dev`
-3. Roles → `ROLE_ANALYST` ✓ → acceso concedido
+3. Roles → `ROLE_ANALYST` ✓ → access granted
 
-El backend **no sabe** que el usuario viene de Toyota. Para él es un usuario
-normal de altana-dev con ROLE_ANALYST.
+The backend **does not know** the user came from Toyota. For it, it's a normal
+altana-dev user with ROLE_ANALYST.
 
 ---
 
-## ENTREVISTA: Preguntas frecuentes sobre B2B Identity Brokering
+## INTERVIEW: Common questions about B2B Identity Brokering
 
-**"¿Qué pasa si el IDP externo cae durante la sesión?"**
-→ La sesión en Altana sigue activa hasta que expire el refresh token.
-  El IDP externo solo es necesario para el login inicial.
-  Una vez que Keycloak tiene su propia sesión, es independiente del IDP externo.
+**"What happens if the external IdP goes down during a session?"**
+→ The session in Altana stays active until the refresh token expires.
+  The external IdP is only needed for the initial login.
+  Once Keycloak has its own session, it is independent of the external IdP.
 
-**"¿Cómo manejas múltiples empresas clientes?"**
-→ Cada empresa → su propio IDP alias en altana-dev.
-  `kc_idp_hint` se inyecta según el subdominio o tenant ID.
-  Los mappers de rol pueden ser por IDP (Toyota → ROLE_ANALYST) o basados en claims del IDP.
+**"How do you handle multiple enterprise clients?"**
+→ Each company gets its own IDP alias in altana-dev.
+  `kc_idp_hint` is injected based on the subdomain or tenant ID.
+  Role mappers can be per-IDP (Toyota → ROLE_ANALYST) or based on IdP claims.
 
-**"¿Qué es un First Broker Login Flow?"**
-→ Cuando un usuario federated llega por primera vez, Keycloak puede ejecutar
-  un "first broker login flow" para: verificar email, vincular a cuenta existente,
-  o crear cuenta nueva automáticamente. Se configura en el IDP.
+**"What is a First Broker Login Flow?"**
+→ When a federated user arrives for the first time, Keycloak can run a
+  "first broker login flow" to: verify email, link to an existing account,
+  or create a new account automatically. Configured on the IDP.
 
-**"¿Diferencia entre Identity Brokering y Federation?"**
-→ Identity Brokering: Keycloak como broker entre SPA y IdP externo (el usuario
-  tiene cuenta en el IdP externo y Keycloak la vincula).
-  Federation: Keycloak sincroniza un directorio completo (LDAP/AD) como si fuera
-  su propia base de datos de usuarios.
+**"Difference between Identity Brokering and Federation?"**
+→ Identity Brokering: Keycloak as broker between SPA and external IdP (the user
+  has an account in the external IdP and Keycloak links it).
+  Federation: Keycloak syncs a full directory (LDAP/AD) as if it were
+  its own user database.
 
-**"¿Por qué usar syncMode=FORCE en B2B?"**
-→ En B2B el IdP externo es la fuente de verdad (HR del cliente maneja los usuarios).
-  FORCE garantiza que cambios en el IdP (nombre, email, departamento) se reflejan
-  en Altana en el siguiente login, sin intervención manual.
+**"Why use syncMode=FORCE in B2B?"**
+→ In B2B the external IdP is the source of truth (client's HR manages the users).
+  FORCE guarantees that changes in the IdP (name, email, department) are reflected
+  in Altana on the next login, without manual intervention.

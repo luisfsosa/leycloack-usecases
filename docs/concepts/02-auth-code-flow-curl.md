@@ -1,9 +1,9 @@
-# Authorization Code Flow + PKCE con curl
+# Authorization Code Flow + PKCE with curl
 
-## El flujo completo (diagrama)
+## The complete flow (diagram)
 
 ```
-Usuario     Browser/App         Keycloak              Tu API
+User        Browser/App         Keycloak              Your API
   |              |                   |                   |
   |--click-----→ |                   |                   |
   |              |--GET /auth?----→  |                   |
@@ -20,14 +20,14 @@ Usuario     Browser/App         Keycloak              Tu API
   |              |←--200 data--------------------------------|
 ```
 
-## PASO 1 — Generar PKCE (code_verifier + code_challenge)
+## STEP 1 — Generate PKCE (code_verifier + code_challenge)
 
-PKCE protege el Authorization Code contra interceptación.
-- `code_verifier`: string aleatorio (43-128 chars, URL-safe)
+PKCE protects the Authorization Code against interception.
+- `code_verifier`: random string (43–128 chars, URL-safe)
 - `code_challenge`: BASE64URL(SHA256(code_verifier))
 
 ```bash
-# Generar code_verifier (32 bytes random → base64url)
+# Generate code_verifier (32 bytes random → base64url)
 CODE_VERIFIER=$(python3 -c "
 import secrets, base64
 verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).rstrip(b'=').decode()
@@ -35,7 +35,7 @@ print(verifier)
 ")
 echo "CODE_VERIFIER: $CODE_VERIFIER"
 
-# Generar code_challenge = BASE64URL(SHA256(verifier))
+# Generate code_challenge = BASE64URL(SHA256(verifier))
 CODE_CHALLENGE=$(python3 -c "
 import hashlib, base64, sys
 verifier = '$CODE_VERIFIER'
@@ -46,7 +46,7 @@ print(challenge)
 echo "CODE_CHALLENGE: $CODE_CHALLENGE"
 ```
 
-## PASO 2 — Construir la Authorization URL y abrir en browser
+## STEP 2 — Build the Authorization URL and open in browser
 
 ```bash
 KEYCLOAK_URL="http://localhost:8080"
@@ -64,17 +64,17 @@ code_challenge=${CODE_CHALLENGE}&\
 code_challenge_method=S256&\
 state=random-state-123"
 
-echo "Abre esta URL en el browser:"
+echo "Open this URL in the browser:"
 echo $AUTH_URL
 ```
 
-Keycloak redirige a: `http://localhost:3000/callback?code=XXXX&state=random-state-123`
-→ Copia el valor de `code=` de la URL (dura ~60 segundos)
+Keycloak redirects to: `http://localhost:3000/callback?code=XXXX&state=random-state-123`
+→ Copy the `code=` value from the URL (it expires in ~60 seconds)
 
-## PASO 3 — Intercambiar el code por tokens
+## STEP 3 — Exchange the code for tokens
 
 ```bash
-CODE="PEGA-EL-CODE-AQUI"
+CODE="PASTE-CODE-HERE"
 
 curl -s -X POST \
   "${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/token" \
@@ -87,7 +87,7 @@ curl -s -X POST \
   | python3 -m json.tool
 ```
 
-### Respuesta esperada:
+### Expected response:
 ```json
 {
   "access_token": "eyJhbGci...",
@@ -100,19 +100,19 @@ curl -s -X POST \
 }
 ```
 
-## PASO 4 — Inspeccionar el JWT (sin librería)
+## STEP 4 — Inspect the JWT (without a library)
 
-Un JWT tiene 3 partes: HEADER.PAYLOAD.SIGNATURE
+A JWT has 3 parts: HEADER.PAYLOAD.SIGNATURE
 
 ```bash
-ACCESS_TOKEN="PEGA-EL-ACCESS-TOKEN-AQUI"
+ACCESS_TOKEN="PASTE-ACCESS-TOKEN-HERE"
 
-# Extraer y decodificar el PAYLOAD (parte del medio)
+# Extract and decode the PAYLOAD (middle part)
 echo $ACCESS_TOKEN | cut -d'.' -f2 | \
   python3 -c "
 import sys, base64, json
 payload = sys.stdin.read().strip()
-# Agregar padding si falta
+# Add padding if missing
 padding = 4 - len(payload) % 4
 if padding != 4:
     payload += '=' * padding
@@ -121,28 +121,28 @@ print(json.dumps(json.loads(decoded), indent=2))
 "
 ```
 
-### Claims importantes que verás:
+### Key claims you will see:
 ```json
 {
-  "exp": 1735689600,        ← Unix timestamp UTC (ENTREVISTA: no tiene timezone)
+  "exp": 1735689600,        ← UTC Unix timestamp (INTERVIEW: no timezone)
   "iat": 1735686000,        ← Issued at
   "iss": "http://localhost:8080/realms/altana-dev",  ← Issuer
-  "sub": "f47ac10b-...",    ← Subject (user ID en Keycloak)
+  "sub": "f47ac10b-...",    ← Subject (user ID in Keycloak)
   "aud": "altana-web",      ← Audience
   "typ": "Bearer",
-  "azp": "altana-web",      ← Authorized party (client que pidió el token)
+  "azp": "altana-web",      ← Authorized party (client that requested the token)
   "realm_access": {
-    "roles": ["ROLE_USER", "ROLE_ADMIN"]   ← Roles del usuario
+    "roles": ["ROLE_USER", "ROLE_ADMIN"]   ← User roles
   },
   "email": "admin@altana.dev",
   "name": "Admin User"
 }
 ```
 
-## PASO 5 — Renovar con Refresh Token
+## STEP 5 — Renew with Refresh Token
 
 ```bash
-REFRESH_TOKEN="PEGA-EL-REFRESH-TOKEN-AQUI"
+REFRESH_TOKEN="PASTE-REFRESH-TOKEN-HERE"
 
 curl -s -X POST \
   "${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/token" \
@@ -153,10 +153,10 @@ curl -s -X POST \
   | python3 -m json.tool
 ```
 
-## PASO 6 — Client Credentials (service-to-service, sin usuario)
+## STEP 6 — Client Credentials (service-to-service, no user)
 
 ```bash
-# supply-chain-backend es un cliente confidencial (tiene secret)
+# supply-chain-backend is a confidential client (has a secret)
 curl -s -X POST \
   "${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
@@ -166,7 +166,7 @@ curl -s -X POST \
   | python3 -m json.tool
 ```
 
-## PASO 7 — Introspección de token (verificar si es válido)
+## STEP 7 — Token introspection (verify if a token is valid)
 
 ```bash
 curl -s -X POST \
@@ -175,23 +175,23 @@ curl -s -X POST \
   -u "supply-chain-backend:CHANGE-ME-IN-PRODUCTION" \
   -d "token=${ACCESS_TOKEN}" \
   | python3 -m json.tool
-# Si "active": true → token válido
-# Si "active": false → expirado o inválido
+# "active": true  → valid token
+# "active": false → expired or invalid
 ```
 
-## Errores frecuentes y cómo diagnosticarlos
+## Common errors and how to diagnose them
 
-| Error HTTP | Mensaje | Causa |
+| HTTP Error | Message | Cause |
 |-----------|---------|-------|
-| 400 | `invalid_grant` | Code ya usado o expirado (>60 seg) |
-| 400 | `invalid_grant` | `code_verifier` no coincide con `code_challenge` |
-| 400 | `invalid_client` | `client_id` incorrecto |
-| 401 | `unauthorized_client` | Cliente no tiene el flujo habilitado |
-| 400 | `redirect_uri_mismatch` | `redirect_uri` no está en la lista permitida |
+| 400 | `invalid_grant` | Code already used or expired (>60 s) |
+| 400 | `invalid_grant` | `code_verifier` does not match `code_challenge` |
+| 400 | `invalid_client` | Incorrect `client_id` |
+| 401 | `unauthorized_client` | Client does not have the flow enabled |
+| 400 | `redirect_uri_mismatch` | `redirect_uri` not in the allowed list |
 
-## Discovery Document (autoconfiguración)
+## Discovery Document (auto-configuration)
 
-Keycloak publica todos sus endpoints en:
+Keycloak publishes all its endpoints at:
 ```
 GET http://localhost:8080/realms/altana-dev/.well-known/openid-configuration
 ```
@@ -201,5 +201,5 @@ curl -s http://localhost:8080/realms/altana-dev/.well-known/openid-configuration
   | python3 -m json.tool | head -40
 ```
 
-Devuelve: authorization_endpoint, token_endpoint, jwks_uri, etc.
-Los frameworks (Spring Security, FastAPI) usan esta URL para auto-configurarse.
+Returns: authorization_endpoint, token_endpoint, jwks_uri, etc.
+Frameworks (Spring Security, FastAPI) use this URL to auto-configure themselves.

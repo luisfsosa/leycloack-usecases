@@ -1,115 +1,115 @@
-# OAuth2 vs OIDC vs SAML – Fundamentos
+# OAuth2 vs OIDC vs SAML — Fundamentals
 
-> ENTREVISTA: "¿Cuál es la diferencia entre OAuth2 y OIDC?" — pregunta casi garantizada
+> **INTERVIEW:** "What is the difference between OAuth2 and OIDC?" — almost guaranteed question
 
-## OAuth2 – Autorización (¿qué puedes hacer?)
+## OAuth2 — Authorization (what can you do?)
 
-OAuth2 NO es un protocolo de autenticación. Es un framework de **delegación de autorización**.
-El Access Token dice: "este usuario autorizó a esta app a hacer X en su nombre".
-
-```
-Usuario → App → "Permiso para acceder a tu email" → Google → Access Token
-```
-
-El Access Token es **opaco** para la app (solo el Resource Server lo entiende).
-
-## OIDC – Autenticación (¿quién eres?)
-
-OpenID Connect es una **capa de identidad sobre OAuth2**.
-Agrega el `id_token` (JWT) que contiene información del usuario (claims).
+OAuth2 is NOT an authentication protocol. It is an **authorization delegation** framework.
+The Access Token says: "this user authorized this app to do X on their behalf".
 
 ```
-OAuth2:  Access Token (autorización)
-OIDC:    Access Token + ID Token (autenticación) + /userinfo endpoint
+User → App → "Permission to access your email" → Google → Access Token
 ```
 
-### Claims estándar del ID Token:
-| Claim | Descripción | Ejemplo |
+The Access Token is **opaque** to the app (only the Resource Server understands it).
+
+## OIDC — Authentication (who are you?)
+
+OpenID Connect is an **identity layer on top of OAuth2**.
+It adds the `id_token` (JWT) which contains user information (claims).
+
+```
+OAuth2:  Access Token (authorization)
+OIDC:    Access Token + ID Token (authentication) + /userinfo endpoint
+```
+
+### Standard ID Token claims:
+| Claim | Description | Example |
 |-------|-------------|---------|
-| `sub` | Subject – ID único del usuario | "f47ac10b-..." |
-| `iss` | Issuer – quién emitió el token | "http://localhost:8080/realms/altana-dev" |
-| `aud` | Audience – para quién es el token | "altana-web" |
-| `exp` | Expiration – Unix timestamp UTC | 1735689600 |
-| `iat` | Issued at – cuándo se emitió | 1735686000 |
-| `email` | Email del usuario | "user@altana.dev" |
-| `name` | Nombre completo | "Felipe Sosa" |
+| `sub` | Subject — unique user ID | "f47ac10b-..." |
+| `iss` | Issuer — who issued the token | "http://localhost:8080/realms/altana-dev" |
+| `aud` | Audience — who the token is for | "altana-web" |
+| `exp` | Expiration — Unix timestamp UTC | 1735689600 |
+| `iat` | Issued at — when it was issued | 1735686000 |
+| `email` | User email | "user@altana.dev" |
+| `name` | Full name | "Felipe Sosa" |
 
-## SAML – El legacy enterprise
+## SAML — The enterprise legacy
 
-SAML 2.0 es anterior a OAuth2. Usa XML en lugar de JSON.
-Sigue siendo muy usado en empresas grandes (Salesforce, Azure AD enterprise).
+SAML 2.0 predates OAuth2. It uses XML instead of JSON.
+Still widely used in large enterprises (Salesforce, Azure AD enterprise).
 
 | | OAuth2/OIDC | SAML |
 |--|------------|------|
-| Formato | JSON/JWT | XML |
-| Mejor para | APIs, mobile, SPA | Enterprise SSO |
-| Complejidad | Menor | Mayor (XML, firmas XML) |
-| Velocidad | Más rápido | Más lento |
+| Format | JSON/JWT | XML |
+| Best for | APIs, mobile, SPA | Enterprise SSO |
+| Complexity | Lower | Higher (XML, XML signatures) |
+| Speed | Faster | Slower |
 
-### Cuándo usas SAML en Keycloak:
-- Integrar con sistemas enterprise del cliente (Okta, ADFS, Azure AD legacy)
-- El cliente B2B exige SAML (muchas empresas grandes lo requieren)
-- Identity Brokering: Keycloak recibe assertions SAML y emite tokens OIDC
+### When you use SAML in Keycloak:
+- Integrating with enterprise client systems (Okta, ADFS, legacy Azure AD)
+- The B2B client requires SAML (many large companies mandate it)
+- Identity Brokering: Keycloak receives SAML assertions and issues OIDC tokens
 
-## Los flujos OAuth2
+## OAuth2 flows
 
-### 1. Authorization Code + PKCE (el más importante)
+### 1. Authorization Code + PKCE (the most important)
 ```
 App → /auth?code_challenge=XXX → Keycloak (login) → code → App → /token?code+verifier → Token
 ```
-- **PKCE** (Proof Key for Code Exchange): protege contra interceptación del code
-- El `code_verifier` es un string aleatorio; `code_challenge = SHA256(verifier)`
-- **Usar siempre en**: SPA, mobile, cualquier cliente público
+- **PKCE** (Proof Key for Code Exchange): protects against code interception
+- The `code_verifier` is a random string; `code_challenge = SHA256(verifier)`
+- **Always use in**: SPA, mobile, any public client
 
 ### 2. Client Credentials (service-to-service)
 ```
-ServiceA → /token?client_id+client_secret → Token → llama a ServiceB
+ServiceA → /token?client_id+client_secret → Token → calls ServiceB
 ```
-- Sin usuario involucrado
-- El token representa al servicio, no a un usuario
-- **Usar en**: microservicios, jobs, scripts automatizados
+- No user involved
+- The token represents the service, not a user
+- **Use in**: microservices, batch jobs, automated scripts
 
-### 3. Device Code (dispositivos limitados)
+### 3. Device Code (limited-input devices)
 ```
-Smart TV → /device → {device_code, user_code} → usuario va a URL en su teléfono → Token
+Smart TV → /device → {device_code, user_code} → user visits URL on phone → Token
 ```
-- Para dispositivos sin teclado/browser
-- **Usar en**: CLI tools, Smart TV, IoT
+- For devices without keyboard/browser
+- **Use in**: CLI tools, Smart TV, IoT
 
 ### 4. Refresh Token
 ```
-App → /token?refresh_token=XXX → Nuevo Access Token (sin re-login)
+App → /token?refresh_token=XXX → New Access Token (no re-login)
 ```
-- Permite renovar access tokens sin interrumpir al usuario
-- El refresh token tiene lifetime más largo que el access token
-- **IMPORTANTE**: si el refresh token expira, el usuario debe hacer login de nuevo
+- Allows renewing access tokens without interrupting the user
+- Refresh token has a longer lifetime than the access token
+- **IMPORTANT**: if the refresh token expires, the user must log in again
 
-## Estructura de un JWT
+## JWT structure
 
-Un JWT tiene 3 partes separadas por puntos:
+A JWT has 3 parts separated by dots:
 ```
-eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyMSJ9.FIRMA
-    HEADER                  PAYLOAD           SIGNATURE
+eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyMSJ9.SIGNATURE
+    HEADER                  PAYLOAD              SIGNATURE
 ```
 
-### Cómo decodificar (debug):
+### How to decode (debug):
 ```bash
-# Con Python (sin verificar firma – solo para debug)
+# With Python (without verifying signature — debug only)
 echo "eyJzdWIiOiJ1c2VyMSJ9" | base64 -d
 
-# Con python-jose
-from jose import jwt
-# Decode sin verificar (SOLO DEBUG)
+# With PyJWT
+import jwt
+# Decode without verifying (DEBUG ONLY)
 payload = jwt.decode(token, options={"verify_signature": False})
 
 # Online: jwt.io
 ```
 
-### IMPORTANTE sobre el campo `exp`:
-- Es un **Unix timestamp en UTC** (segundos desde 1970-01-01 00:00:00 UTC)
-- NO tiene información de timezone
-- Para convertir: `datetime.utcfromtimestamp(exp)` en Python
-- Para verificar expiración: `exp < time.time()` → expirado
+### IMPORTANT about the `exp` field:
+- It is a **Unix timestamp in UTC** (seconds since 1970-01-01 00:00:00 UTC)
+- It has NO timezone information
+- To convert: `datetime.utcfromtimestamp(exp)` in Python
+- To check expiry: `exp < time.time()` → expired
 
 ```python
 import time
@@ -117,5 +117,5 @@ from datetime import datetime, timezone
 
 exp = 1735689600
 print(datetime.fromtimestamp(exp, tz=timezone.utc))  # 2026-01-01 00:00:00+00:00
-print("Expirado" if exp < time.time() else "Válido")
+print("Expired" if exp < time.time() else "Valid")
 ```

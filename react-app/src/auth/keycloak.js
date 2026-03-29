@@ -35,7 +35,13 @@ export const endpoints = {
  *   sessionStorage se limpia al cerrar la pestaña, menor superficie de ataque.
  *   Si usáramos localStorage, el verifier podría persistir indefinidamente.
  */
-export async function startLogin(codeChallenge, state) {
+/**
+ * idpHint (optional): if provided, adds kc_idp_hint=<alias> to skip the
+ * Keycloak login screen and go directly to the specified Identity Provider.
+ * Pattern 2 — Email domain discovery: derive the hint from the email domain
+ * before calling this function.
+ */
+export async function startLogin(codeChallenge, state, idpHint = null) {
   const params = new URLSearchParams({
     client_id:             CLIENT_ID,
     response_type:         'code',
@@ -45,6 +51,10 @@ export async function startLogin(codeChallenge, state) {
     code_challenge_method: 'S256',
     state,
   });
+
+  if (idpHint) {
+    params.set('kc_idp_hint', idpHint);
+  }
 
   window.location.href = `${endpoints.auth}?${params}`;
 }

@@ -1,28 +1,28 @@
-# Patrón B2B2C — Multi-Tenant con Keycloak y FastAPI
+# B2B2C Pattern — Multi-Tenant with Keycloak and FastAPI
 
-> **Escenario:** Toyota (empresa cliente de Altana) tiene dos tipos de usuarios:
-> - **Empleados internos** (`user_type=employee`) que analizan datos de supply chain
-> - **Clientes finales** (`user_type=customer`) que solo ven sus propios envíos
+> **Scenario:** Toyota (Altana's enterprise client) has two types of users:
+> - **Internal employees** (`user_type=employee`) who analyze supply chain data
+> - **End customers** (`user_type=customer`) who only see their own shipments
 >
-> Ambos se autentican contra el IdP de Toyota, pero tienen acceso diferente en Altana.
+> Both authenticate against the Toyota IdP, but have different access in Altana.
 
 ---
 
-## ¿Qué es B2B2C?
+## What is B2B2C?
 
 ```
 Altana (SaaS)
-  └── Toyota (cliente B2B)
-        ├── john.doe       → empleado interno → ROLE_ANALYST → ve todo
-        └── jane.consumer  → cliente final    → ROLE_VIEWER  → ve solo su tenant
+  └── Toyota (B2B client)
+        ├── john.doe       → internal employee → ROLE_ANALYST → sees everything
+        └── jane.consumer  → end customer      → ROLE_VIEWER  → sees only their tenant
 ```
 
-**B2B** = Toyota se autentica contra Altana via Identity Brokering
-**B2B2C** = Los usuarios finales de Toyota (consumidores) también usan Altana, pero con acceso restringido al tenant de Toyota
+**B2B** = Toyota authenticates against Altana via Identity Brokering
+**B2B2C** = Toyota's end users (consumers) also use Altana, but with access restricted to the Toyota tenant
 
 ---
 
-## Arquitectura del flujo
+## Architecture of the flow
 
 ```
 jane.consumer            Keycloak altana-dev         Toyota IDP (toyota-corp)
@@ -31,7 +31,7 @@ jane.consumer            Keycloak altana-dev         Toyota IDP (toyota-corp)
       │                         │── redirect ──────────────►│
       │◄── redirect to Toyota ──│                           │
       │                                                     │
-      │── credenciales ─────────────────────────────────────►│
+      │── credentials ──────────────────────────────────────►│
       │◄── code ────────────────────────────────────────────│
       │                                                     │
       │── code ────────────────►│                           │
@@ -40,16 +40,16 @@ jane.consumer            Keycloak altana-dev         Toyota IDP (toyota-corp)
       │                         │    (sub, email,           │
       │                         │     user_type=customer)   │
       │                         │                           │
-      │                         │ [IDP Mappers ejecutados]  │
+      │                         │ [IDP Mappers executed]    │
       │                         │  sync user_type=customer  │
       │                         │  → assign ROLE_VIEWER     │
       │                         │  → set tenant_id=toyota   │
       │                         │                           │
       │                         │ [Protocol Mappers]        │
-      │                         │  → añade user_type al JWT │
-      │                         │  → añade tenant_id al JWT │
+      │                         │  → add user_type to JWT   │
+      │                         │  → add tenant_id to JWT   │
       │                         │                           │
-      │◄── JWT de Altana ───────│                           │
+      │◄── Altana JWT ──────────│                           │
       │    roles: [ROLE_VIEWER] │                           │
       │    tenant_id: toyota    │                           │
       │    user_type: customer  │                           │
@@ -57,16 +57,16 @@ jane.consumer            Keycloak altana-dev         Toyota IDP (toyota-corp)
 
 ---
 
-## Configuración en Keycloak
+## Keycloak Configuration
 
 ### 1. Toyota IDP (realm `toyota-corp`) — User Profile
 
-Keycloak 24+ requiere declarar atributos custom en User Profile antes de usarlos.
-Sin esta declaración, el atributo se ignora silenciosamente.
+Keycloak 24+ requires declaring custom attributes in User Profile before using them.
+Without this declaration, the attribute is silently ignored.
 
 ```
 Admin → toyota-corp → Realm Settings → User Profile
-→ Añadir atributo: user_type (String, no requerido)
+→ Add attribute: user_type (String, not required)
 ```
 
 ```json
@@ -85,9 +85,9 @@ Admin → toyota-corp → Realm Settings → User Profile
 }
 ```
 
-### 2. Protocol Mapper en `altana-broker` client (toyota-corp)
+### 2. Protocol Mapper on `altana-broker` client (toyota-corp)
 
-Para que `user_type` aparezca en el token que toyota-corp emite hacia altana-dev:
+For `user_type` to appear in the token that toyota-corp issues toward altana-dev:
 
 ```
 toyota-corp → Clients → altana-broker → Client Scopes → Mappers
@@ -98,19 +98,19 @@ toyota-corp → Clients → altana-broker → Client Scopes → Mappers
   Add to access token: ON
 ```
 
-### 3. IDP Mappers en altana-dev (para toyota-corp IDP)
+### 3. IDP Mappers in altana-dev (for toyota-corp IDP)
 
-Cinco mappers procesan el token de toyota-corp cuando un usuario llega:
+Five mappers process the toyota-corp token when a user arrives:
 
-| Mapper | Tipo | Qué hace |
-|--------|------|----------|
-| `email mapper` | `oidc-user-attribute-idp-mapper` | Copia email del IDP al usuario local |
-| `sync user_type attribute` | `oidc-user-attribute-idp-mapper` | Copia claim `user_type` como atributo |
-| `employee gets ANALYST` | `oidc-advanced-role-idp-mapper` | Si `user_type=employee` → asigna ROLE_ANALYST |
-| `customer gets VIEWER` | `oidc-advanced-role-idp-mapper` | Si `user_type=customer` → asigna ROLE_VIEWER |
-| `tenant_id toyota` | `hardcoded-attribute-idp-mapper` | Siempre asigna `tenant_id=toyota` |
+| Mapper | Type | What it does |
+|--------|------|--------------|
+| `email mapper` | `oidc-user-attribute-idp-mapper` | Copies email from IdP to local user |
+| `sync user_type attribute` | `oidc-user-attribute-idp-mapper` | Copies `user_type` claim as attribute |
+| `employee gets ANALYST` | `oidc-advanced-role-idp-mapper` | If `user_type=employee` → assigns ROLE_ANALYST |
+| `customer gets VIEWER` | `oidc-advanced-role-idp-mapper` | If `user_type=customer` → assigns ROLE_VIEWER |
+| `tenant_id toyota` | `hardcoded-attribute-idp-mapper` | Always assigns `tenant_id=toyota` |
 
-**Configuración crítica — `syncMode: FORCE`**
+**Critical configuration — `syncMode: FORCE`**
 
 ```json
 // mapper employee gets ANALYST
@@ -125,15 +125,15 @@ Cinco mappers procesan el token de toyota-corp cuando un usuario llega:
 ```
 
 > **IMPORT vs FORCE:**
-> - `IMPORT`: el mapper solo corre en la primera vez que el usuario llega (nuevo usuario)
-> - `FORCE`: el mapper corre en cada broker login, actualizando atributos y roles
+> - `IMPORT`: the mapper only runs the first time the user arrives (new user)
+> - `FORCE`: the mapper runs on every broker login, updating attributes and roles
 >
-> Usar `FORCE` es más seguro: si un usuario cambia de `employee` a `customer`,
-> sus roles se actualizan en el siguiente login.
+> Using `FORCE` is safer: if a user changes from `employee` to `customer`,
+> their roles are updated on the next login.
 
-### 4. Protocol Mappers en `altana-web` client (altana-dev)
+### 4. Protocol Mappers on `altana-web` client (altana-dev)
 
-Para que `tenant_id` y `user_type` lleguen al JWT final que recibe FastAPI:
+For `tenant_id` and `user_type` to reach the final JWT that FastAPI receives:
 
 ```
 altana-dev → Clients → altana-web → Client Scopes → Mappers
@@ -143,7 +143,7 @@ altana-dev → Clients → altana-web → Client Scopes → Mappers
 
 ---
 
-## El JWT resultante
+## The resulting JWT
 
 ### john.doe (employee)
 ```json
@@ -175,9 +175,9 @@ altana-dev → Clients → altana-web → Client Scopes → Mappers
 
 ---
 
-## Implementación en FastAPI
+## FastAPI implementation
 
-### TokenData — los campos B2B2C
+### TokenData — the B2B2C fields
 
 ```python
 @dataclass
@@ -191,7 +191,7 @@ class TokenData:
     raw: dict
 ```
 
-### Filtrado por tenant en el endpoint
+### Tenant filtering in the endpoint
 
 ```python
 @router.get("/my-shipments")
@@ -205,7 +205,7 @@ async def my_shipments(
         {"id": "SH-004", "tenant_id": "toyota", ...},
     ]
 
-    # ROLE_VIEWER solo ve su tenant
+    # ROLE_VIEWER can only see their own tenant
     if "ROLE_VIEWER" in user.roles \
        and "ROLE_ANALYST" not in user.roles \
        and "ROLE_ADMIN" not in user.roles:
@@ -215,97 +215,97 @@ async def my_shipments(
             "shipments": [s for s in all_shipments if s["tenant_id"] == tenant]
         }
 
-    # ANALYST / ADMIN ven todo
+    # ANALYST / ADMIN see everything
     return {"filter": "none (full access)", "shipments": all_shipments}
 ```
 
-**Principio clave:** el `tenant_id` viene del JWT — ya fue validado criptográficamente por FastAPI.
-El backend no necesita consultar Keycloak para saber de qué empresa es el usuario.
+**Key principle:** `tenant_id` comes from the JWT — already cryptographically validated by FastAPI.
+The backend does not need to query Keycloak to know which company the user belongs to.
 
 ---
 
-## Resultados de la prueba
+## Test results
 
 ```
 GET /supply-chain/my-shipments
 
-john.doe   (ROLE_ANALYST)  → filter: "none (full access)" → 4 envíos (toyota + ford)
-jane.consumer (ROLE_VIEWER) → filter: "tenant=toyota"      → 3 envíos (solo toyota)
+john.doe   (ROLE_ANALYST)  → filter: "none (full access)" → 4 shipments (toyota + ford)
+jane.consumer (ROLE_VIEWER) → filter: "tenant=toyota"      → 3 shipments (toyota only)
 
-GET /supply-chain/shipments  (solo ANALYST/ADMIN)
+GET /supply-chain/shipments  (ANALYST/ADMIN only)
 
 jane.consumer (ROLE_VIEWER) → 403 Forbidden
-  "Se requiere uno de estos roles: ['ROLE_ANALYST', 'ROLE_ADMIN']"
+  "Required one of these roles: ['ROLE_ANALYST', 'ROLE_ADMIN']"
 ```
 
 ---
 
-## Lecciones aprendidas (errores reales en este proyecto)
+## Lessons learned (real errors in this project)
 
-### 1. Keycloak 24+ User Profile bloquea atributos no declarados
+### 1. Keycloak 24+ User Profile blocks undeclared attributes
 
-**Síntoma:** `user_type` se guardaba en el usuario de toyota-corp sin error,
-pero al leer el usuario via API el atributo no aparecía.
+**Symptom:** `user_type` was saved on the toyota-corp user without error,
+but when reading the user via API the attribute did not appear.
 
-**Causa:** Keycloak 24 introdujo User Profile. Los atributos no declarados
-se ignoran silenciosamente al guardar via Admin API.
+**Cause:** Keycloak 24 introduced User Profile. Undeclared attributes
+are silently ignored when saving via Admin API.
 
-**Fix:** Declarar el atributo en `PUT /admin/realms/{realm}/users/profile`
-antes de intentar usarlo.
+**Fix:** Declare the attribute in `PUT /admin/realms/{realm}/users/profile`
+before trying to use it.
 
-### 2. syncMode IMPORT no re-ejecuta mappers en usuarios existentes
+### 2. syncMode IMPORT does not re-run mappers on existing users
 
-**Síntoma:** usuarios ya importados no recibían los nuevos atributos/roles
-aunque los mappers estuvieran correctamente configurados.
+**Symptom:** already imported users were not receiving new attributes/roles
+even though the mappers were correctly configured.
 
-**Causa:** `syncMode: IMPORT` solo corre en la primera vez que el usuario
-llega via el broker (primer login). Si el usuario ya existe, el mapper no se ejecuta.
+**Cause:** `syncMode: IMPORT` only runs the first time the user
+arrives via the broker (first login). If the user already exists, the mapper does not run.
 
-**Fix:** Cambiar a `syncMode: FORCE`. O bien, borrar el usuario federado
-de altana-dev para forzar un re-import limpio.
+**Fix:** Switch to `syncMode: FORCE`. Or delete the federated user
+from altana-dev to force a clean re-import.
 
-### 3. oidc-advanced-role-idp-mapper — formato del config `claims`
+### 3. oidc-advanced-role-idp-mapper — `claims` config format
 
-El campo `claims` espera un JSON array serializado como string:
+The `claims` field expects a JSON array serialized as a string:
 
 ```json
-// CORRECTO
+// CORRECT
 "claims": "[{\"key\": \"user_type\", \"value\": \"employee\"}]"
 
-// INCORRECTO (objeto directo)
+// WRONG (direct object)
 "claims": {"key": "user_type", "value": "employee"}
 ```
 
-### 4. Siempre verificar mapper types via API antes de crear mappers
+### 4. Always verify mapper types via API before creating mappers
 
 ```bash
 GET /admin/realms/{realm}/identity-provider/instances/{alias}/mapper-types
 ```
 
-Los nombres de tipos cambian entre versiones de Keycloak.
-En Keycloak 26: `oidc-advanced-role-idp-mapper` (no `advanced-role-idp-mapper`).
+Type names change between Keycloak versions.
+In Keycloak 26: `oidc-advanced-role-idp-mapper` (not `advanced-role-idp-mapper`).
 
 ---
 
-## Patrón para producción
+## Production pattern
 
-En producción, el filtrado por tenant se hace en la capa de base de datos:
+In production, tenant filtering happens at the database layer:
 
 ```python
-# En vez de filtrar en memoria:
+# Instead of in-memory filtering:
 shipments = db.query(Shipment).filter(
-    Shipment.tenant_id == user.tenant_id  # tenant del JWT
+    Shipment.tenant_id == user.tenant_id  # tenant from JWT
 ).all()
 ```
 
-El `tenant_id` del JWT es confiable porque:
-1. El JWT fue firmado por Keycloak (verificación criptográfica)
-2. El `tenant_id` fue asignado por un `hardcoded-attribute-idp-mapper` en Keycloak
-   (no lo puede cambiar el usuario)
-3. FastAPI valida la firma antes de extraer cualquier claim
+The `tenant_id` from the JWT is trustworthy because:
+1. The JWT was signed by Keycloak (cryptographic verification)
+2. The `tenant_id` was assigned by a `hardcoded-attribute-idp-mapper` in Keycloak
+   (the user cannot change it)
+3. FastAPI validates the signature before extracting any claim
 
-**Pregunta de entrevista:** ¿Cómo evitas que un usuario de Toyota vea datos de Ford?
-> El `tenant_id` viene en el JWT firmado por Keycloak. El Resource Server (FastAPI)
-> valida la firma y extrae el tenant. Todas las queries a DB incluyen
-> `WHERE tenant_id = :tenant_id` con el valor del token. El usuario nunca
-> puede manipular su propio tenant_id porque eso requeriría falsificar el JWT.
+**Interview question:** How do you prevent a Toyota user from seeing Ford data?
+> The `tenant_id` comes in the JWT signed by Keycloak. The Resource Server (FastAPI)
+> validates the signature and extracts the tenant. All DB queries include
+> `WHERE tenant_id = :tenant_id` with the value from the token. The user can never
+> manipulate their own tenant_id because that would require forging the JWT.

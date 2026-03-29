@@ -92,19 +92,21 @@ export function AuthProvider({ children }) {
     sessionStorage.removeItem('pkce_state');
   }, []);
 
-  /** Inicia el login PKCE — genera verifier/challenge y redirige a Keycloak */
-  const login = useCallback(async () => {
+  /**
+   * Starts the PKCE login flow and redirects to Keycloak.
+   * idpHint (optional): if provided, Keycloak skips the login screen and sends
+   * the user directly to the matching Identity Provider (kc_idp_hint param).
+   * Used by Pattern 2 — Email domain discovery in HomePage.
+   */
+  const login = useCallback(async (idpHint = null) => {
     const verifier   = generateCodeVerifier();
     const challenge  = await generateCodeChallenge(verifier);
     const state      = generateState();
 
-    // Guardar en sessionStorage ANTES del redirect
-    // Al volver del callback los recuperamos
     sessionStorage.setItem('pkce_verifier', verifier);
     sessionStorage.setItem('pkce_state', state);
 
-    await startLogin(challenge, state);
-    // A partir de aquí el browser navega a Keycloak
+    await startLogin(challenge, state, idpHint);
   }, []);
 
   /**

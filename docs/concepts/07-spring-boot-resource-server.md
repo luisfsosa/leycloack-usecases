@@ -1,17 +1,17 @@
-# UC1 — Spring Boot como Resource Server con Keycloak
+# UC1 — Spring Boot as a Keycloak Resource Server
 
-## ¿Qué aprendes aquí?
+## What you learn here
 
-Cómo proteger una API Java/Spring Boot con tokens JWT emitidos por Keycloak.
-Es el patrón más común en arquitecturas microservicios enterprise:
-Keycloak emite el token → tu servicio Spring lo valida y extrae roles/claims.
+How to protect a Java/Spring Boot API with JWT tokens issued by Keycloak.
+This is the most common pattern in enterprise microservice architectures:
+Keycloak issues the token → your Spring service validates it and extracts roles/claims.
 
 ---
 
-## Arquitectura del flujo
+## Architecture of the flow
 
 ```
-Cliente (curl / React / Python)
+Client (curl / React / Python)
     │
     │  1. POST /token → Keycloak
     │  ← access_token (JWT RS256)
@@ -20,25 +20,25 @@ Cliente (curl / React / Python)
     │     Authorization: Bearer <token>
     │
     ▼
-Spring Boot (puerto 8081)
+Spring Boot (port 8081)
     │
     ├─ SecurityFilterChain
-    │     ├─ Verifica firma RS256 (descarga JWKS de Keycloak automáticamente)
-    │     ├─ Valida exp, iss
-    │     ├─ Verifica roles (RBAC)
-    │     └─ Inyecta Jwt en el controller via @AuthenticationPrincipal
+    │     ├─ Verifies RS256 signature (auto-downloads JWKS from Keycloak)
+    │     ├─ Validates exp, iss
+    │     ├─ Checks roles (RBAC)
+    │     └─ Injects Jwt in the controller via @AuthenticationPrincipal
     │
     └─ SupplyChainController
-          └─ Usa jwt.getClaim("preferred_username"), roles, tenant_id, etc.
+          └─ Uses jwt.getClaim("preferred_username"), roles, tenant_id, etc.
 ```
 
-**Diferencia clave vs FastAPI:**
-- FastAPI: tú escribes `Depends(get_current_user)` manualmente
-- Spring: el framework intercepta el request antes del controller automáticamente
+**Key difference vs FastAPI:**
+- FastAPI: you write `Depends(get_current_user)` manually
+- Spring: the framework intercepts the request before the controller automatically
 
 ---
 
-## Dependencias (build.gradle)
+## Dependencies (build.gradle)
 
 ```groovy
 dependencies {
@@ -47,11 +47,11 @@ dependencies {
 }
 ```
 
-`oauth2-resource-server` incluye todo: validación JWT, JWKS client, integración con Spring Security.
+`oauth2-resource-server` includes everything: JWT validation, JWKS client, Spring Security integration.
 
 ---
 
-## application.yml — configuración mínima
+## application.yml — minimal configuration
 
 ```yaml
 server:
@@ -65,17 +65,17 @@ spring:
           issuer-uri: http://localhost:8080/realms/altana-dev
 ```
 
-`issuer-uri` hace **dos cosas automáticamente**:
-1. Descarga las public keys desde `{issuer-uri}/protocol/openid-connect/certs` (JWKS)
-2. Valida que el claim `iss` del token coincida con esta URI
+`issuer-uri` does **two things automatically**:
+1. Downloads the public keys from `{issuer-uri}/protocol/openid-connect/certs` (JWKS)
+2. Validates that the `iss` claim in the token matches this URI
 
-> **ENTREVISTA:** ¿Dónde obtiene Spring las public keys para verificar el JWT?
-> → Las descarga automáticamente del endpoint JWKS de Keycloak usando `issuer-uri`.
-> Keycloak rota las keys periódicamente — Spring las refresca en background.
+> **INTERVIEW:** Where does Spring get the public keys to verify the JWT?
+> → It downloads them automatically from the Keycloak JWKS endpoint using `issuer-uri`.
+> Keycloak rotates keys periodically — Spring refreshes them in the background.
 
 ---
 
-## SecurityConfig — el corazón de la protección
+## SecurityConfig — the heart of protection
 
 ```java
 @Configuration
@@ -105,33 +105,33 @@ public class SecurityConfig {
 }
 ```
 
-**(1) STATELESS:** Las APIs REST no usan sesión HTTP — cada request lleva su propio token.
+**(1) STATELESS:** REST APIs do not use HTTP sessions — each request carries its own token.
 
-**(2) CSRF deshabilitado:** CSRF protege contra ataques en apps con cookies de sesión.
-Como usamos Bearer tokens (no cookies), CSRF no aplica.
+**(2) CSRF disabled:** CSRF protects against attacks in apps with session cookies.
+Since we use Bearer tokens (not cookies), CSRF does not apply.
 
-**(3) permitAll():** El endpoint `/health` no requiere token (útil para load balancers, probes).
+**(3) permitAll():** The `/health` endpoint requires no token (useful for load balancers, probes).
 
-**(4) jwtAuthenticationConverter:** Le decimos a Spring cómo transformar el JWT en un objeto
-`Authentication` con los roles correctos. Sin esto, Spring no ve los roles de Keycloak.
+**(4) jwtAuthenticationConverter:** We tell Spring how to transform the JWT into an
+`Authentication` object with the correct roles. Without this, Spring does not see Keycloak roles.
 
-> **ENTREVISTA:** ¿Por qué deshabilitas CSRF en tu Resource Server?
-> → CSRF explota que el browser envía cookies automáticamente. Los Resource Servers
-> usan Bearer tokens en el header `Authorization`, no cookies — el browser nunca
-> envía el token "automáticamente", así que CSRF no aplica.
+> **INTERVIEW:** Why do you disable CSRF in your Resource Server?
+> → CSRF exploits the fact that the browser sends cookies automatically. Resource Servers
+> use Bearer tokens in the `Authorization` header, not cookies — the browser never
+> sends the token "automatically", so CSRF does not apply.
 
-> **ENTREVISTA (Spring Security 6):** ¿Dónde fue `WebSecurityConfigurerAdapter`?
-> → Eliminado en Spring Security 6. Se reemplaza por `@Bean SecurityFilterChain`.
-> Menos herencia, más composición.
+> **INTERVIEW (Spring Security 6):** Where did `WebSecurityConfigurerAdapter` go?
+> → Removed in Spring Security 6. Replaced by `@Bean SecurityFilterChain`.
+> Less inheritance, more composition.
 
 ---
 
-## KeycloakJwtConverter — el problema de los roles
+## KeycloakJwtConverter — the roles problem
 
-**El problema:** Spring Security lee roles del claim `scope` por defecto.
-Keycloak pone los roles en `realm_access.roles`.
+**The problem:** Spring Security reads roles from the `scope` claim by default.
+Keycloak puts roles in `realm_access.roles`.
 
-Sin el converter → Spring no ve ningún rol → todos los endpoints RBAC dan **403**.
+Without the converter → Spring sees no roles → all RBAC endpoints return **403**.
 
 ```java
 @Component
@@ -158,7 +158,7 @@ public class KeycloakJwtConverter implements Converter<Jwt, AbstractAuthenticati
 }
 ```
 
-**Claim `realm_access` en un JWT de Keycloak:**
+**`realm_access` claim in a Keycloak JWT:**
 ```json
 {
   "realm_access": {
@@ -167,27 +167,27 @@ public class KeycloakJwtConverter implements Converter<Jwt, AbstractAuthenticati
 }
 ```
 
-> **ENTREVISTA:** ¿Por qué un endpoint con `hasRole("ANALYST")` da 403 con Keycloak
-> sin configuración extra?
-> → Spring Security busca el claim `scope` o `authorities` por defecto.
-> Keycloak pone los roles en `realm_access.roles`. Sin un `JwtAuthenticationConverter`
-> custom que lea ese claim, Spring no encuentra ningún rol y deniega el acceso.
+> **INTERVIEW:** Why does an endpoint with `hasRole("ANALYST")` return 403 with Keycloak
+> without extra configuration?
+> → Spring Security looks for the `scope` or `authorities` claim by default.
+> Keycloak puts roles in `realm_access.roles`. Without a custom `JwtAuthenticationConverter`
+> that reads that claim, Spring finds no roles and denies access.
 
 ---
 
 ## hasRole() vs hasAuthority()
 
-| Método | Busca | Ejemplo |
-|--------|-------|---------|
-| `hasRole("ANALYST")` | `"ROLE_ANALYST"` (añade prefijo automáticamente) | `.hasRole("ANALYST")` |
-| `hasAuthority("ROLE_ANALYST")` | `"ROLE_ANALYST"` literalmente | `.hasAuthority("ROLE_ANALYST")` |
+| Method | Looks for | Example |
+|--------|-----------|---------|
+| `hasRole("ANALYST")` | `"ROLE_ANALYST"` (auto-adds prefix) | `.hasRole("ANALYST")` |
+| `hasAuthority("ROLE_ANALYST")` | `"ROLE_ANALYST"` literally | `.hasAuthority("ROLE_ANALYST")` |
 
-Como los roles de Keycloak ya vienen con prefijo `ROLE_`, usamos **`hasAuthority()`**
-para evitar el doble prefijo `ROLE_ROLE_ANALYST`.
+Since Keycloak roles already come with the `ROLE_` prefix, we use **`hasAuthority()`**
+to avoid the double prefix `ROLE_ROLE_ANALYST`.
 
 ---
 
-## Controller — recibir el JWT inyectado
+## Controller — receiving the injected JWT
 
 ```java
 @GetMapping("/suppliers")
@@ -199,11 +199,11 @@ public Map<String, Object> listSuppliers(@AuthenticationPrincipal Jwt jwt) {
 }
 ```
 
-`@AuthenticationPrincipal Jwt jwt` — Spring inyecta el JWT ya validado.
-Si el token es de un **service account** (Client Credentials), no hay `preferred_username`
-→ usamos `client_id` como fallback.
+`@AuthenticationPrincipal Jwt jwt` — Spring injects the already-validated JWT.
+If the token is from a **service account** (Client Credentials), there is no `preferred_username`
+→ we use `client_id` as fallback.
 
-**Equivalente en FastAPI:**
+**Equivalent in FastAPI:**
 ```python
 # FastAPI
 @app.get("/suppliers")
@@ -217,23 +217,23 @@ public Map listSuppliers(@AuthenticationPrincipal Jwt jwt) { ... }
 
 ---
 
-## Endpoints implementados
+## Implemented endpoints
 
-| Método | Ruta | Acceso | Descripción |
+| Method | Path | Access | Description |
 |--------|------|--------|-------------|
-| GET | `/supply-chain/health` | Público | Health check |
-| GET | `/supply-chain/suppliers` | Autenticado | Lista proveedores |
-| GET | `/supply-chain/me` | Autenticado | Info del token actual |
-| GET | `/supply-chain/shipments` | `ROLE_ANALYST` o `ROLE_ADMIN` | Lista envíos (RBAC) |
-| DELETE | `/supply-chain/suppliers/{id}` | Solo `ROLE_ADMIN` | Eliminar proveedor |
-| GET | `/supply-chain/my-shipments` | Autenticado | Envíos filtrados por `tenant_id` (B2B2C) |
+| GET | `/supply-chain/health` | Public | Health check |
+| GET | `/supply-chain/suppliers` | Authenticated | List suppliers |
+| GET | `/supply-chain/me` | Authenticated | Current token info |
+| GET | `/supply-chain/shipments` | `ROLE_ANALYST` or `ROLE_ADMIN` | List shipments (RBAC) |
+| DELETE | `/supply-chain/suppliers/{id}` | `ROLE_ADMIN` only | Delete supplier |
+| GET | `/supply-chain/my-shipments` | Authenticated | Shipments filtered by `tenant_id` (B2B2C) |
 
 ---
 
-## Probar con curl
+## Testing with curl
 
 ```bash
-# 1. Obtener token (Client Credentials — service account)
+# 1. Get token (Client Credentials — service account)
 TOKEN=$(curl -s -X POST http://localhost:8080/realms/altana-dev/protocol/openid-connect/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=client_credentials" \
@@ -241,43 +241,43 @@ TOKEN=$(curl -s -X POST http://localhost:8080/realms/altana-dev/protocol/openid-
   -d "client_secret=${KEYCLOAK_CLIENT_SECRET}" \
   | python -m json.tool | grep access_token | cut -d'"' -f4)
 
-# 2. Endpoint público (sin token)
+# 2. Public endpoint (no token)
 curl http://localhost:8081/supply-chain/health
 
-# 3. Endpoint autenticado
+# 3. Authenticated endpoint
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8081/supply-chain/suppliers
 
-# 4. Endpoint RBAC — 403 si el token no tiene ROLE_ANALYST
+# 4. RBAC endpoint — 403 if the token doesn't have ROLE_ANALYST
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8081/supply-chain/shipments
 
-# 5. Inspeccionar claims del token actual
+# 5. Inspect current token claims
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8081/supply-chain/me
 ```
 
 ---
 
-## Errores comunes y cómo diagnosticarlos
+## Common errors and how to diagnose them
 
-| Error | Causa | Solución |
+| Error | Cause | Solution |
 |-------|-------|---------|
-| `401 Unauthorized` | Token ausente, expirado o firma inválida | Verificar `exp`, renovar token |
-| `403 Forbidden` | Token válido pero sin el rol requerido | Verificar `realm_access.roles` en el JWT, revisar KeycloakJwtConverter |
-| `500` al arrancar | `issuer-uri` no alcanzable | Verificar que Keycloak esté corriendo en el puerto correcto |
-| `ROLE_ROLE_ANALYST` no funciona | Usar `hasRole()` con roles que ya tienen prefijo | Cambiar a `hasAuthority()` |
+| `401 Unauthorized` | Token missing, expired, or invalid signature | Check `exp`, renew token |
+| `403 Forbidden` | Valid token but missing required role | Check `realm_access.roles` in JWT, review KeycloakJwtConverter |
+| `500` on startup | `issuer-uri` unreachable | Verify Keycloak is running on the correct port |
+| `ROLE_ROLE_ANALYST` doesn't work | Using `hasRole()` with roles that already have the prefix | Switch to `hasAuthority()` |
 
 ---
 
-## Resumen: lo que hace Spring automáticamente
+## Summary: what Spring does automatically
 
-Cuando llega un request con `Authorization: Bearer <token>`:
+When a request arrives with `Authorization: Bearer <token>`:
 
-1. `BearerTokenAuthenticationFilter` extrae el token del header
-2. Descarga JWKS de Keycloak (cachea las keys)
-3. Verifica firma RS256
-4. Valida `exp` e `iss`
-5. Llama a `KeycloakJwtConverter` → crea `JwtAuthenticationToken` con roles
-6. Guarda en `SecurityContextHolder`
-7. `SecurityFilterChain` evalúa reglas RBAC
-8. Si pasa → llega al controller con `@AuthenticationPrincipal Jwt jwt` ya listo
+1. `BearerTokenAuthenticationFilter` extracts the token from the header
+2. Downloads JWKS from Keycloak (caches the keys)
+3. Verifies RS256 signature
+4. Validates `exp` and `iss`
+5. Calls `KeycloakJwtConverter` → creates `JwtAuthenticationToken` with roles
+6. Stores in `SecurityContextHolder`
+7. `SecurityFilterChain` evaluates RBAC rules
+8. If passed → reaches the controller with `@AuthenticationPrincipal Jwt jwt` ready
 
-**Todo esto en ~3 líneas de config** (`issuer-uri` + converter + filterChain).
+**All of this in ~3 lines of config** (`issuer-uri` + converter + filterChain).

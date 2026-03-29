@@ -1,128 +1,162 @@
-# Patrones de Login UX para B2B y B2B2C en React
+# B2B and B2B2C Login UX Patterns in React
 
-> **Pregunta central:** si tengo múltiples clientes enterprise (Toyota, Ford, BMW),
-> ¿cómo sabe mi app React a qué Identity Provider mandar al usuario?
+> **Core question:** if I have multiple enterprise clients (Toyota, Ford, BMW),
+> how does my React app know which Identity Provider to send the user to?
 
 ---
 
-## Patrón 1: Lista de IDPs con logos
+## Pattern 1: IDP list with logos
 
 ```
 ┌─────────────────────────────────┐
-│  Iniciar sesión en Altana       │
+│  Sign in to Altana              │
 │                                 │
-│  [🔵 Continuar con Toyota]      │
-│  [🟢 Continuar con Ford]        │
-│  [🔴 Continuar con BMW]         │
+│  [🔵 Continue with Toyota]      │
+│  [🟢 Continue with Ford]        │
+│  [🔴 Continue with BMW]         │
 │                                 │
-│  ──── o ────                    │
-│  [Usuario / Contraseña]         │
+│  ──── or ────                   │
+│  [Username / Password]          │
 └─────────────────────────────────┘
 ```
 
-React hardcodea los clientes conocidos. Cada botón arranca el PKCE flow
-con `kc_idp_hint=toyota-corp` para ir directo al IDP sin pasar por el
-login screen de Keycloak.
+React hardcodes the known clients. Each button starts the PKCE flow
+with `kc_idp_hint=toyota-corp` to go directly to the IDP without passing through
+the Keycloak login screen.
 
-**Cuándo usarlo:** pocos clientes conocidos (< 10), SaaS con lista cerrada.
+**When to use:** few known clients (< 10), SaaS with a closed list.
 
 ---
 
-## Patrón 2: Email domain discovery
+## Pattern 2: Email domain discovery
 
 ```
 ┌─────────────────────────────────┐
-│  Tu email corporativo:          │
+│  Your corporate email:          │
 │  [john@toyota.com        ]      │
-│  [Continuar →]                  │
+│  [Continue →]                   │
 └─────────────────────────────────┘
-        ↓ React detecta @toyota.com
-        ↓ mapea a kc_idp_hint=toyota-corp
-        ↓ redirige directo al IDP de Toyota
+        ↓ React detects @toyota.com
+        ↓ maps to kc_idp_hint=toyota-corp
+        ↓ redirects directly to Toyota's IDP
 ```
 
-React mantiene un mapa `dominio → IDP alias`. El usuario escribe su email,
-React extrae el dominio y sabe a qué IDP mandar. Si el dominio no está
-en el mapa, cae al login genérico de Keycloak.
+React maintains a `domain → IDP alias` map. The user types their email,
+React extracts the domain and knows which IDP to send them to. If the domain
+is not in the map, it falls back to the generic Keycloak login.
 
-**Cuándo usarlo:** muchos clientes, usuarios no técnicos, flujo estilo
-Google Workspace o Microsoft 365.
+**When to use:** many clients, non-technical users, flow like
+Google Workspace or Microsoft 365.
+
+### Implementation
+
+```js
+// Domain → Keycloak IDP alias map
+const DOMAIN_IDP_MAP = {
+  'toyota.com': 'toyota-corp',
+  'ford.com':   'ford-corp',
+  'bmw.com':    'bmw-corp',
+};
+
+function getIdpHint(email) {
+  const domain = email.split('@')[1]?.toLowerCase();
+  return DOMAIN_IDP_MAP[domain] ?? null;  // null → generic Keycloak login
+}
+
+// In the form submit handler:
+function handleSubmit(e) {
+  e.preventDefault();
+  const hint = getIdpHint(email);
+  login(hint);  // login(null) → no kc_idp_hint → Keycloak login page
+}
+```
+
+The `kc_idp_hint` parameter is added to the PKCE authorization URL:
+```
+/auth?...&kc_idp_hint=toyota-corp
+```
+Keycloak skips its login screen and redirects immediately to the Toyota IdP.
+
+> **INTERVIEW:** "What happens if the domain is not recognized?"
+> → `getIdpHint` returns `null`, and `startLogin` is called without `kc_idp_hint`.
+>   The user lands on the standard Keycloak login page where they can enter
+>   credentials directly or see any other configured IDPs.
 
 ---
 
-## Patrón 3: Subdominio por cliente (white-label)
+## Pattern 3: Per-client subdomain (white-label)
 
 ```
-toyota.altana.com  →  kc_idp_hint=toyota-corp  →  Login Toyota
-ford.altana.com    →  kc_idp_hint=ford-corp    →  Login Ford
-app.altana.com     →  selector genérico
+toyota.altana.com  →  kc_idp_hint=toyota-corp  →  Toyota Login
+ford.altana.com    →  kc_idp_hint=ford-corp    →  Ford Login
+app.altana.com     →  generic selector
 ```
 
-React lee `window.location.hostname` al arrancar. Si detecta un subdominio
-conocido, arranca el PKCE flow ya con `kc_idp_hint` fijo. El usuario final
-de Toyota nunca ve una pantalla de selección — va directo a su SSO.
+React reads `window.location.hostname` on startup. If it detects a known
+subdomain, it starts the PKCE flow already with `kc_idp_hint` set. The Toyota
+end user never sees a selection screen — they go directly to their SSO.
 
-**Cuándo usarlo:** clientes enterprise que quieren URL propia, portales
-con branding del cliente (colores, logo del cliente en la app).
+**When to use:** enterprise clients that want their own URL, portals
+with client branding (client's colors and logo in the app).
 
 ---
 
-## B2B2C: ¿una app o varias?
+## B2B2C: one app or multiple?
 
-### Opción A: Una sola app, UI condicional por `user_type`
+### Option A: Single app, conditional UI by `user_type`
 
-El login es el mismo para todos. Después del callback, React lee los claims
-del JWT (`user_type`, `roles`) y renderiza la UI correspondiente.
+Login is the same for everyone. After the callback, React reads the
+JWT claims (`user_type`, `roles`) and renders the corresponding UI.
 
 ```
-mismo login URL
+same login URL
     ↓
-JWT con user_type=employee → Dashboard de analista
-JWT con user_type=customer → Dashboard de cliente final
+JWT with user_type=employee → analyst dashboard
+JWT with user_type=customer → end customer dashboard
 ```
 
-**Cuándo usarlo:** la diferencia entre empleado y cliente es solo de
-permisos y vista, la app en sí es la misma.
+**When to use:** the difference between employee and customer is only
+permissions and view, the app itself is the same.
 
-### Opción B: Portal dedicado por tipo de usuario
+### Option B: Dedicated portal per user type
 
 ```
-app.altana.com          → empleados internos / analistas
-toyota.altana.com       → portal de clientes finales de Toyota
-  └── kc_idp_hint=toyota-corp hardcodeado
-  └── branding de Toyota (logo, colores)
+app.altana.com          → internal employees / analysts
+toyota.altana.com       → Toyota end customers portal
+  └── kc_idp_hint=toyota-corp hardcoded
+  └── Toyota branding (logo, colors)
 ```
 
-El portal de Toyota usa `kc_idp_hint` fijo. El usuario final ni sabe
-que existe Keycloak detrás.
+The Toyota portal uses a fixed `kc_idp_hint`. The end user doesn't even know
+that Keycloak exists behind it.
 
-**Cuándo usarlo:** la experiencia es tan diferente que justifica una
-app separada, o el cliente paga por white-label total.
+**When to use:** the experience is different enough to justify a separate
+app, or the client pays for full white-label.
 
 ---
 
-## Resumen: ¿cuál patrón usar?
+## Summary: which pattern to use?
 
-| Situación | Patrón |
-|-----------|--------|
-| Pocos clientes conocidos | Lista de botones con logos |
-| Muchos clientes, usuarios no técnicos | Email domain discovery |
-| Clientes enterprise con URL propia | Subdominio + `kc_idp_hint` fijo |
-| B2B2C misma app, roles distintos | Una app, UI condicional por `user_type` |
-| B2B2C portal dedicado por cliente | Subdominio separado + white-label |
+| Situation | Pattern |
+|-----------|---------|
+| Few known clients | Button list with logos |
+| Many clients, non-technical users | Email domain discovery |
+| Enterprise clients with their own URL | Subdomain + fixed `kc_idp_hint` |
+| B2B2C same app, different roles | Single app, conditional UI by `user_type` |
+| B2B2C dedicated portal per client | Separate subdomain + white-label |
 
 ---
 
-## Pregunta de entrevista
+## Interview question
 
-**¿Cómo sabe tu app React a qué Identity Provider mandar al usuario?**
+**"How does your React app know which Identity Provider to send the user to?"**
 
-> Depende del contexto. Para un SaaS con lista cerrada de clientes mostramos
-> botones por IDP usando `kc_idp_hint`. Para flujos self-service con muchos
-> clientes usamos email domain discovery: el usuario escribe su email,
-> extraemos el dominio y lo mapeamos al alias del IDP en Keycloak.
-> Para clientes enterprise con white-label usamos subdominio propio —
-> `toyota.altana.com` lleva `kc_idp_hint=toyota-corp` hardcodeado y el
-> usuario nunca ve una pantalla de selección.
-> En todos los casos Keycloak maneja el protocolo OAuth2/OIDC —
-> React solo decide con qué `kc_idp_hint` arranca el PKCE flow.
+> It depends on the context. For a SaaS with a closed client list, we show
+> buttons per IDP using `kc_idp_hint`. For self-service flows with many
+> clients we use email domain discovery: the user types their email,
+> we extract the domain and map it to the IDP alias in Keycloak.
+> For enterprise clients with white-label we use a dedicated subdomain —
+> `toyota.altana.com` carries `kc_idp_hint=toyota-corp` hardcoded and the
+> user never sees a selection screen.
+> In all cases Keycloak handles the OAuth2/OIDC protocol —
+> React only decides which `kc_idp_hint` to start the PKCE flow with.
