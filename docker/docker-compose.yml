@@ -73,6 +73,10 @@ services:
       - ./keycloak/realms:/opt/keycloak/data/import
       # Themes personalizados (para UC2)
       - ./keycloak/themes:/opt/keycloak/themes
+      # SPI Extensions: JARs en esta carpeta son cargados automáticamente
+      # CONCEPTO: Keycloak usa java.util.ServiceLoader para descubrir providers
+      # en /opt/keycloak/providers/ al iniciar con start-dev.
+      - ./keycloak/providers:/opt/keycloak/providers
     ports:
       - "8080:8080"
       - "9000:9000"   # Management port (health/metrics)

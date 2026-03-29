@@ -1,0 +1,12 @@
+server:
+  port: 8081
+
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # issuer-uri hace dos cosas:
+          # 1. Descarga las public keys via JWKS (para verificar firmas RS256)
+          # 2. Valida que el claim 'iss' del token coincida con esta URI
+          issuer-uri: http://localhost:8080/realms/altana-dev

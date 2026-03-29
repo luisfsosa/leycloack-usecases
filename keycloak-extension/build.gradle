@@ -1,0 +1,48 @@
+/*
+ * CONCEPTO: Keycloak SPI Extension
+ *
+ * Las dependencias de Keycloak van como 'compileOnly' porque:
+ * - Al empaquetar el JAR, NO incluimos las clases de Keycloak
+ * - Keycloak ya las tiene en su propio classpath cuando carga nuestro JAR
+ * - Si las incluyéramos → conflictos de clases en runtime
+ *
+ * ENTREVISTA: ¿Por qué compileOnly y no implementation en una extensión Keycloak?
+ * → Porque las APIs de Keycloak son "provided" — el container (Keycloak) las provee.
+ *   Es equivalente a 'provided' en Maven o 'compileOnly' en Gradle.
+ *   Incluirlas en el JAR causaría ClassLoader conflicts.
+ */
+plugins {
+    id 'java'
+}
+
+group = 'com.altana'
+version = '1.0.0'
+
+java {
+    // Keycloak 26 corre en Java 21 dentro de Docker.
+    // Compilamos con Java 26 (disponible localmente) pero generamos
+    // bytecode compatible con Java 21.
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // APIs del SPI de Keycloak — solo para compilar, no incluir en el JAR
+    compileOnly 'org.keycloak:keycloak-core:26.5.6'
+    compileOnly 'org.keycloak:keycloak-server-spi:26.5.6'
+    compileOnly 'org.keycloak:keycloak-server-spi-private:26.5.6'
+    // AbstractOIDCProtocolMapper y OIDCAttributeMapperHelper viven en keycloak-services
+    compileOnly 'org.keycloak:keycloak-services:26.5.6'
+}
+
+jar {
+    archiveBaseName = 'altana-keycloak-extension'
+    archiveVersion = project.version
+
+    // CONCEPTO: Sin 'fat jar' — solo nuestro código.
+    // Las dependencias de Keycloak las provee el servidor.
+}

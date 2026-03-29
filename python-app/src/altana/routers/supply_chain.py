@@ -50,10 +50,12 @@ async def list_suppliers(user: TokenData = Depends(get_current_user)):
 async def my_profile(user: TokenData = Depends(get_current_user)):
     """Devuelve los datos del usuario actual extraidos del JWT."""
     return {
-        "sub": user.sub,
-        "username": user.username,
-        "email": user.email,
-        "roles": user.roles,
+        "sub":       user.sub,
+        "username":  user.username,
+        "email":     user.email,
+        "roles":     user.roles,
+        "tenant_id": user.tenant_id,   # B2B2C: "toyota" | None
+        "user_type": user.user_type,   # B2B2C: "employee" | "customer" | None
     }
 
 
@@ -108,4 +110,45 @@ async def flag_compliance(
         "supplier_id": supplier_id,
         "reason": reason,
         "status": "flagged"
+    }
+
+
+# ─── ENDPOINTS B2B2C ─────────────────────────────────────────────────────────
+
+@router.get("/my-shipments")
+async def my_shipments(user: TokenData = Depends(require_role("ROLE_VIEWER", "ROLE_ANALYST", "ROLE_ADMIN"))):
+    """
+    B2B2C: endpoint para consumidores finales (ROLE_VIEWER) y empleados.
+
+    CONCEPTO: filtrado por tenant_id
+    - ROLE_VIEWER (consumidor): ve solo los envios de su empresa (tenant_id)
+    - ROLE_ANALYST/ADMIN: ve todos los envios
+
+    En produccion: tenant_id se usa para filtrar en base de datos.
+    Aqui simulamos el filtrado con datos en memoria.
+    """
+    # Dataset simulado con tenant_id
+    all_shipments = [
+        {"id": "SH-001", "origin": "Shanghai",  "destination": "LA", "status": "in_transit", "tenant_id": "toyota"},
+        {"id": "SH-002", "origin": "Hamburg",   "destination": "NY", "status": "delivered",  "tenant_id": "toyota"},
+        {"id": "SH-003", "origin": "Tokyo",     "destination": "LA", "status": "pending",    "tenant_id": "ford"},
+        {"id": "SH-004", "origin": "Osaka",     "destination": "NY", "status": "in_transit", "tenant_id": "toyota"},
+    ]
+
+    # ROLE_VIEWER: solo ve su tenant
+    if "ROLE_VIEWER" in user.roles and "ROLE_ANALYST" not in user.roles and "ROLE_ADMIN" not in user.roles:
+        tenant = user.tenant_id or ""
+        shipments = [s for s in all_shipments if s["tenant_id"] == tenant]
+        return {
+            "requested_by": user.username,
+            "tenant_id":    tenant,
+            "filter":       f"tenant={tenant}",
+            "shipments":    shipments,
+        }
+
+    # ROLE_ANALYST / ROLE_ADMIN: ve todo
+    return {
+        "requested_by": user.username,
+        "filter":       "none (full access)",
+        "shipments":    all_shipments,
     }

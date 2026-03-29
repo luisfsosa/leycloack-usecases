@@ -30,6 +30,8 @@ class TokenData:
     username: str      # preferred_username
     email: str | None
     roles: list[str]   # realm roles
+    tenant_id: str | None  # B2B2C: empresa de origen (ej: "toyota")
+    user_type: str | None  # B2B2C: "employee" | "customer" | None
     raw: dict          # payload completo por si necesitas algo mas
 
 
@@ -52,6 +54,8 @@ async def get_current_user(
         username=payload.get("preferred_username", ""),
         email=payload.get("email"),
         roles=payload.get("realm_access", {}).get("roles", []),
+        tenant_id=payload.get("tenant_id"),
+        user_type=payload.get("user_type"),
         raw=payload,
     )
 
