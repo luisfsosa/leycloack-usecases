@@ -2,41 +2,41 @@ package com.altana.keycloak.mapper;
 
 /*
  * ============================================================
- * CONCEPTO: Keycloak Protocol Mapper SPI
+ * CONCEPT: Keycloak Protocol Mapper SPI
  * ============================================================
  *
- * Un Protocol Mapper es código Java que Keycloak ejecuta
- * en el momento de EMITIR un token JWT.
+ * A Protocol Mapper is Java code that Keycloak executes at the
+ * moment of ISSUING a JWT token.
  *
- * Flujo completo:
- *   Usuario autentica → Keycloak arma el JWT
- *   → Para cada mapper configurado en el client:
- *       mapper.setClaim(token, ...)   ← aquí entra nuestro código
- *   → Firma el JWT y lo devuelve
+ * Full flow:
+ *   User authenticates → Keycloak builds the JWT
+ *   → For each mapper configured on the client:
+ *       mapper.setClaim(token, ...)   ← our code runs here
+ *   → Signs the JWT and returns it
  *
- * ¿Para qué sirve vs mapper via UI?
- *   UI mapper (user-attribute):  lee un atributo de usuario → claim
- *   SPI mapper:                  lógica custom — transformaciones,
- *                                lookups externos, enriquecimiento, etc.
+ * What does this offer over a UI-configured mapper?
+ *   UI mapper (user-attribute):  reads a user attribute → claim
+ *   SPI mapper:                  custom logic — transformations,
+ *                                external lookups, enrichment, etc.
  *
- * ENTREVISTA: ¿Qué es el SPI de Keycloak?
- * → Service Provider Interface — mecanismo de extensión de Keycloak.
- *   Defines una clase Java que implementa una interfaz de Keycloak,
- *   la empaquetas en un JAR y la colocas en /opt/keycloak/providers/.
- *   Keycloak la descubre automáticamente via java.util.ServiceLoader.
+ * INTERVIEW: What is the Keycloak SPI?
+ * → Service Provider Interface — Keycloak's extension mechanism.
+ *   You define a Java class implementing a Keycloak interface,
+ *   package it as a JAR, and place it in /opt/keycloak/providers/.
+ *   Keycloak discovers it automatically via java.util.ServiceLoader.
  *
  * ============================================================
- * JERARQUÍA DE CLASES
+ * CLASS HIERARCHY
  * ============================================================
  *
  * AbstractOIDCProtocolMapper
  *   └── TenantIdMapper
- *         ├── implements OIDCAccessTokenMapper  → agrega claim al access_token
- *         └── implements OIDCIDTokenMapper      → agrega claim al id_token
+ *         ├── implements OIDCAccessTokenMapper  → adds claim to access_token
+ *         └── implements OIDCIDTokenMapper      → adds claim to id_token
  *
- * Nota Keycloak 26: OIDCUserInfoMapper fue eliminado. La inclusión en /userinfo
- * se controla via el checkbox "Add to userinfo" que OIDCAttributeMapperHelper
- * agrega automáticamente en addIncludeInTokensConfig().
+ * Note Keycloak 26: OIDCUserInfoMapper was removed. Inclusion in /userinfo
+ * is controlled by the "Add to userinfo" checkbox that OIDCAttributeMapperHelper
+ * adds automatically via addIncludeInTokensConfig().
  *
  * ============================================================
  */
@@ -59,18 +59,18 @@ public class TenantIdMapper extends AbstractOIDCProtocolMapper
         implements OIDCAccessTokenMapper, OIDCIDTokenMapper {
 
     /*
-     * PROVIDER_ID: identificador único del mapper en Keycloak.
-     * Aparece en la lista de tipos al agregar un mapper en la UI.
-     * Debe ser único en todo el servidor — usar prefijo del proyecto.
+     * PROVIDER_ID: unique identifier of this mapper in Keycloak.
+     * Appears in the type list when adding a mapper in the Admin UI.
+     * Must be unique across the entire server — use a project-specific prefix.
      */
     public static final String PROVIDER_ID = "altana-tenant-id-mapper";
 
     /*
-     * configProperties: lista de campos configurables que aparecen
-     * en la UI de Keycloak cuando configuras este mapper en un client.
+     * configProperties: list of configurable fields shown in the Keycloak Admin UI
+     * when the admin configures this mapper on a client.
      *
-     * OIDCAttributeMapperHelper agrega los campos estándar:
-     *   - "Token Claim Name" → nombre del claim en el JWT (ej: "tenant_id")
+     * OIDCAttributeMapperHelper adds the standard fields:
+     *   - "Token Claim Name" → name of the claim in the JWT (e.g. "tenant_id")
      *   - "Add to access token" → checkbox
      *   - "Add to ID token" → checkbox
      *   - "Add to userinfo" → checkbox
@@ -82,27 +82,27 @@ public class TenantIdMapper extends AbstractOIDCProtocolMapper
         OIDCAttributeMapperHelper.addIncludeInTokensConfig(configProperties, TenantIdMapper.class);
     }
 
-    // ─── Metadata del mapper (aparece en la UI de Keycloak) ───────────────────
+    // ─── Mapper metadata (shown in the Keycloak Admin UI) ────────────────────
 
     @Override
     public String getId() {
-        return PROVIDER_ID;  // identificador interno único
+        return PROVIDER_ID;  // unique internal identifier
     }
 
     @Override
     public String getDisplayCategory() {
-        return TOKEN_MAPPER_CATEGORY;  // constante = "Token mapper"
+        return TOKEN_MAPPER_CATEGORY;  // constant = "Token mapper"
     }
 
     @Override
     public String getDisplayType() {
-        return "Altana Tenant ID Mapper";  // nombre en la UI
+        return "Altana Tenant ID Mapper";  // label shown in the UI
     }
 
     @Override
     public String getHelpText() {
-        return "Lee el atributo 'tenant_id' del usuario y lo agrega al JWT. " +
-               "Configura 'Token Claim Name' como 'tenant_id'.";
+        return "Reads the 'tenant_id' attribute from the user and adds it to the JWT. " +
+               "Set 'Token Claim Name' to 'tenant_id'.";
     }
 
     @Override
@@ -110,22 +110,22 @@ public class TenantIdMapper extends AbstractOIDCProtocolMapper
         return configProperties;
     }
 
-    // ─── Lógica principal: aquí construimos el claim ──────────────────────────
+    // ─── Core logic: building the claim ──────────────────────────────────────
 
     /*
-     * setClaim() es llamado por Keycloak una vez por token emitido.
+     * setClaim() is called by Keycloak once per token issued.
      *
-     * Parámetros clave:
-     *   token          → el JWT en construcción (podemos modificarlo)
-     *   mappingModel   → la configuración del mapper (nombre del claim, etc.)
-     *   userSession    → la sesión del usuario → acceso a User, atributos, etc.
-     *   keycloakSession→ acceso a todos los servicios de Keycloak (DB, etc.)
-     *   clientSessionCtx → contexto del client que pidió el token
+     * Key parameters:
+     *   token          → the JWT being built (we can modify it)
+     *   mappingModel   → the mapper configuration (claim name, etc.)
+     *   userSession    → the user session → access to User, attributes, etc.
+     *   keycloakSession→ access to all Keycloak services (DB, etc.)
+     *   clientSessionCtx → context of the client that requested the token
      *
-     * ENTREVISTA: ¿Cómo accedes a los datos del usuario dentro de un mapper?
-     * → userSession.getUser() devuelve el UserModel.
-     *   getFirstAttribute("nombre") lee atributos custom del usuario.
-     *   getEmail(), getUsername(), etc. para campos estándar.
+     * INTERVIEW: How do you access user data inside a mapper?
+     * → userSession.getUser() returns the UserModel.
+     *   getFirstAttribute("name") reads custom user attributes.
+     *   getEmail(), getUsername(), etc. for standard fields.
      */
     @Override
     protected void setClaim(IDToken token,
@@ -134,24 +134,24 @@ public class TenantIdMapper extends AbstractOIDCProtocolMapper
                             KeycloakSession keycloakSession,
                             ClientSessionContext clientSessionCtx) {
 
-        // Leer el atributo "tenant_id" del usuario en Keycloak.
-        // Este atributo se configura en la UI: Users → {user} → Attributes
+        // Read the "tenant_id" attribute from the Keycloak user.
+        // This attribute is configured in the UI: Users → {user} → Attributes
         String tenantId = userSession.getUser().getFirstAttribute("tenant_id");
 
         if (tenantId == null || tenantId.isBlank()) {
-            // Sin tenant_id no agregamos el claim al token.
-            // Si fuera obligatorio podríamos lanzar una excepción aquí
-            // para bloquear la emisión del token.
+            // No tenant_id → do not add the claim to the token.
+            // If it were mandatory, you could throw an exception here
+            // to block token issuance entirely.
             return;
         }
 
         /*
-         * OIDCAttributeMapperHelper.mapClaim() hace el trabajo sucio:
-         * - Lee el nombre del claim desde mappingModel ("Token Claim Name")
-         * - Soporta notación con puntos: "org.tenant" → claim anidado
-         * - Agrega el valor al IDToken (que luego se serializa a JWT)
+         * OIDCAttributeMapperHelper.mapClaim() does the heavy lifting:
+         * - Reads the claim name from mappingModel ("Token Claim Name")
+         * - Supports dot notation: "org.tenant" → nested claim
+         * - Adds the value to the IDToken (later serialized to JWT)
          *
-         * Esto respeta la configuración que el admin hizo en la UI.
+         * This honours whatever configuration the admin made in the UI.
          */
         OIDCAttributeMapperHelper.mapClaim(token, mappingModel, tenantId);
     }

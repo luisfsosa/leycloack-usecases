@@ -1,15 +1,15 @@
 /*
- * CONCEPTO: Keycloak SPI Extension
+ * CONCEPT: Keycloak SPI Extension build
  *
- * Las dependencias de Keycloak van como 'compileOnly' porque:
- * - Al empaquetar el JAR, NO incluimos las clases de Keycloak
- * - Keycloak ya las tiene en su propio classpath cuando carga nuestro JAR
- * - Si las incluyéramos → conflictos de clases en runtime
+ * Keycloak dependencies are declared as 'compileOnly' because:
+ * - When packaging the JAR, we do NOT include Keycloak's own classes
+ * - Keycloak already has them on its classpath when it loads our JAR
+ * - Including them would cause ClassLoader conflicts at runtime
  *
- * ENTREVISTA: ¿Por qué compileOnly y no implementation en una extensión Keycloak?
- * → Porque las APIs de Keycloak son "provided" — el container (Keycloak) las provee.
- *   Es equivalente a 'provided' en Maven o 'compileOnly' en Gradle.
- *   Incluirlas en el JAR causaría ClassLoader conflicts.
+ * INTERVIEW: Why compileOnly and not implementation in a Keycloak extension?
+ * → Because Keycloak's APIs are "provided" — the container (Keycloak) supplies them.
+ *   Equivalent to 'provided' in Maven or 'compileOnly' in Gradle.
+ *   Bundling them in the JAR would cause ClassLoader conflicts.
  */
 plugins {
     id 'java'
@@ -19,9 +19,9 @@ group = 'com.altana'
 version = '1.0.0'
 
 java {
-    // Keycloak 26 corre en Java 21 dentro de Docker.
-    // Compilamos con Java 26 (disponible localmente) pero generamos
-    // bytecode compatible con Java 21.
+    // Keycloak 26 runs on Java 21 inside Docker.
+    // We compile with Java 26 (available locally) but produce
+    // bytecode targeting Java 21.
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
 }
@@ -31,18 +31,75 @@ repositories {
 }
 
 dependencies {
-    // APIs del SPI de Keycloak — solo para compilar, no incluir en el JAR
+    // Keycloak SPI APIs — compile-only, not bundled in the JAR.
+    // INTERVIEW: Why compileOnly? → the container provides them at runtime.
+    //   Bundling them would cause ClassLoader conflicts in Keycloak.
     compileOnly 'org.keycloak:keycloak-core:26.5.6'
     compileOnly 'org.keycloak:keycloak-server-spi:26.5.6'
     compileOnly 'org.keycloak:keycloak-server-spi-private:26.5.6'
-    // AbstractOIDCProtocolMapper y OIDCAttributeMapperHelper viven en keycloak-services
     compileOnly 'org.keycloak:keycloak-services:26.5.6'
+
+    // ── Unit tests ────────────────────────────────────────────────────────────
+    // Tests DO need Keycloak classes available (to mock their interfaces).
+    // No ClassLoader conflict risk since no Keycloak server runs in the same
+    // JVM as the unit tests.
+    testImplementation 'org.keycloak:keycloak-core:26.5.6'
+    testImplementation 'org.keycloak:keycloak-server-spi:26.5.6'
+    testImplementation 'org.keycloak:keycloak-server-spi-private:26.5.6'
+    testImplementation 'org.keycloak:keycloak-services:26.5.6'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    // Gradle 9+ requires the JUnit Platform launcher on the test runtime classpath
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation 'org.mockito:mockito-core:5.11.0'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.11.0'
+    testImplementation 'org.assertj:assertj-core:3.25.3'
+
+    // ── Integration tests ─────────────────────────────────────────────────────
+    // Testcontainers spins up a real Keycloak in Docker to verify that the JAR
+    // loads and providers register correctly.
+    // dasniko/testcontainers-keycloak is the community-standard library.
+    testImplementation 'org.testcontainers:junit-jupiter:1.19.8'
+    // dasniko/testcontainers-keycloak brings keycloak-admin-client as a transitive
+    // dependency (24.0.3) — the admin client API is stable across versions.
+    // We do NOT pin keycloak-admin-client explicitly because 26.5.6 does not exist
+    // on Maven Central (only keycloak-core and server-spi reach that version).
+    testImplementation 'com.github.dasniko:testcontainers-keycloak:3.3.1'
+}
+
+// Unit tests: exclude integration tests from the normal build cycle
+test {
+    useJUnitPlatform {
+        excludeTags 'integration'
+    }
+    // Byte Buddy (used by Mockito to generate mocks) officially supports only up to
+    // Java 22. The project runs Java 26 locally. This flag enables experimental mode
+    // so Java 23+ does not produce an error.
+    // INTERVIEW: Why put JVM flags in build.gradle instead of the CLI?
+    // → So every developer (and CI) runs with the same configuration.
+    jvmArgs '-Dnet.bytebuddy.experimental=true'
+}
+
+// Integration tests: separate task that starts Docker
+// Usage: ./gradlew integrationTest
+// Requires Docker running (Rancher Desktop, Docker Desktop, etc.)
+tasks.register('integrationTest', Test) {
+    description = 'Runs integration tests against a real Keycloak in Docker.'
+    group = 'verification'
+    useJUnitPlatform {
+        includeTags 'integration'
+    }
+    mustRunAfter test
+    // IT tests need the compiled JAR to mount it into the container
+    dependsOn jar
+    // Same flag as the 'test' task — Byte Buddy experimental for Java 23+
+    jvmArgs '-Dnet.bytebuddy.experimental=true'
 }
 
 jar {
     archiveBaseName = 'altana-keycloak-extension'
     archiveVersion = project.version
 
-    // CONCEPTO: Sin 'fat jar' — solo nuestro código.
-    // Las dependencias de Keycloak las provee el servidor.
+    // CONCEPT: No fat JAR — only our own code.
+    // Keycloak's dependencies are provided by the server at runtime.
 }

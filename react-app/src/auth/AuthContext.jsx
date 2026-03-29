@@ -19,7 +19,7 @@
 
 import { createContext, useContext, useRef, useState, useEffect, useCallback } from 'react';
 import { generateCodeVerifier, generateCodeChallenge, generateState } from './pkce';
-import { startLogin, exchangeCode, refreshAccessToken, decodeJwt, logout as kcLogout } from './keycloak';
+import { startLogin, startRegistration, exchangeCode, refreshAccessToken, decodeJwt, logout as kcLogout } from './keycloak';
 
 const AuthContext = createContext(null);
 
@@ -110,6 +110,22 @@ export function AuthProvider({ children }) {
   }, []);
 
   /**
+   * UC6 — Inicia el flujo de REGISTRO en Keycloak.
+   * Igual que login pero redirige al formulario de registro.
+   * loginHint pre-rellena el email del proveedor invitado.
+   */
+  const register = useCallback(async (loginHint = null) => {
+    const verifier  = generateCodeVerifier();
+    const challenge = await generateCodeChallenge(verifier);
+    const state     = generateState();
+
+    sessionStorage.setItem('pkce_verifier', verifier);
+    sessionStorage.setItem('pkce_state', state);
+
+    await startRegistration(challenge, state, loginHint);
+  }, []);
+
+  /**
    * Procesa el callback de Keycloak (/callback?code=XXX&state=YYY)
    * Llamado desde el componente <CallbackPage>
    */
@@ -161,6 +177,7 @@ export function AuthProvider({ children }) {
       loading,
       isAuthenticated: !!user,
       login,
+      register,
       logout,
       handleCallback,
       getAccessToken,

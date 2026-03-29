@@ -9,7 +9,8 @@
  * Por claridad educativa aquí las definimos explícitamente.
  */
 
-const KEYCLOAK_URL   = 'http://localhost:8080';
+import { KEYCLOAK_URL } from '../config';
+
 const REALM          = 'altana-dev';
 const CLIENT_ID      = 'altana-web';
 const REDIRECT_URI   = 'http://localhost:5173/callback'; // puerto de Vite
@@ -63,6 +64,38 @@ export async function startLogin(codeChallenge, state, idpHint = null, loginHint
   if (loginHint)  params.set('login_hint',  loginHint);
 
   window.location.href = `${endpoints.auth}?${params}`;
+}
+
+/**
+ * UC6 — Redirigir al formulario de REGISTRO de Keycloak.
+ *
+ * Keycloak expone un endpoint de registrations:
+ *   /realms/{realm}/protocol/openid-connect/registrations
+ *
+ * Es equivalente al auth endpoint pero con action=register implícito.
+ * loginHint pre-rellena el email en el formulario de registro.
+ *
+ * ENTREVISTA: "¿Cómo envías al usuario al registro en lugar del login?"
+ * → Keycloak tiene el endpoint /registrations que arranca el flujo PKCE
+ *   pero muestra el formulario de registro en lugar del de login.
+ *   Después del registro, el callback es idéntico al del login normal.
+ */
+export async function startRegistration(codeChallenge, state, loginHint = null) {
+  const registrationEndpoint = `${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/registrations`;
+
+  const params = new URLSearchParams({
+    client_id:             CLIENT_ID,
+    response_type:         'code',
+    scope:                 'openid profile email',
+    redirect_uri:          REDIRECT_URI,
+    code_challenge:        codeChallenge,
+    code_challenge_method: 'S256',
+    state,
+  });
+
+  if (loginHint) params.set('login_hint', loginHint);
+
+  window.location.href = `${registrationEndpoint}?${params}`;
 }
 
 /**

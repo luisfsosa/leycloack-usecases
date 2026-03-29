@@ -189,6 +189,64 @@ public void onEvent(AdminEvent adminEvent, boolean includeRepresentation) {
 
 ## Enabling the listener in Keycloak
 
+### Paso 1 — Verificar que el JAR está cargado
+
+```bash
+docker logs altana-keycloak 2>&1 | grep -i "altana-security"
+# Esperado: KC-SERVICES0047: altana-security-listener (com.altana.keycloak.listener.AltanaSecurityListenerFactory) ...
+```
+
+Si no aparece: verificar que el JAR está en `docker/keycloak/providers/` y recrear el contenedor.
+
+---
+
+### Paso 2 — Habilitar el listener en el realm (Admin UI)
+
+1. **Realm Settings** → pestaña **Events**
+2. En **Event listeners**: click en el campo y seleccionar `altana-security-listener`
+   - Mantener también `jboss-logging` (el listener por defecto de Keycloak)
+   - La lista debe quedar: `jboss-logging`, `altana-security-listener`
+3. Click **Save**
+
+---
+
+### Paso 3 — Habilitar guardado de eventos en la UI (opcional pero recomendado en dev)
+
+En la misma pestaña **Events**:
+
+**User events:**
+1. Activar **Save events**: ON
+2. En **Saved types**: seleccionar los eventos que quieres guardar en DB:
+   - `LOGIN`, `LOGOUT`, `LOGIN_ERROR`, `REGISTER`, `UPDATE_PASSWORD`
+3. **Expiration**: `1` Day (para dev; en prod ajustar según política de retención)
+4. Click **Save**
+
+**Admin events:**
+1. Activar **Save admin events**: ON
+2. Activar **Include representation** (guarda el JSON completo de la operación)
+3. Click **Save**
+
+> **Nota:** "Save events" los almacena en la base de datos de Keycloak y los hace visibles en la UI.
+> El `altana-security-listener` escribe en stdout independientemente de este toggle.
+> Son dos mecanismos independientes — puedes tener uno sin el otro.
+
+---
+
+### Paso 4 — Ver eventos guardados en la UI
+
+**User events:**
+1. Menú lateral → **Events**
+2. Pestaña **User events**
+3. Filtrar por tipo, usuario, IP o fecha
+4. Cada fila muestra: timestamp, tipo, usuario, cliente, IP, detalles
+
+**Admin events:**
+1. Menú lateral → **Events**
+2. Pestaña **Admin events**
+3. Cada fila muestra: timestamp, operación (CREATE/UPDATE/DELETE), tipo de recurso, quién lo hizo
+
+---
+
 ### Via Admin API (scripted, CI/CD friendly)
 
 ```bash
@@ -202,13 +260,6 @@ curl -s -X PUT "$KC/admin/realms/altana-dev" \
     "adminEventsDetailsEnabled": true
   }'
 ```
-
-### Via Admin UI
-
-1. **Realm Settings** → **Events** tab
-2. **Event listeners** → add `altana-security-listener`
-3. Enable **Save events** (stores in DB so you can query via API)
-4. Enable **Save admin events**
 
 ---
 

@@ -48,7 +48,7 @@
 |----------|-----|-------|
 | Keycloak | http://localhost:8080 | admin / admin |
 | Spring Boot | http://localhost:8081 | Resource Server Java |
-| FastAPI | http://localhost:8002 | Resource Server Python |
+| FastAPI | http://localhost:8081 | Resource Server Python (comparte puerto con Spring, nunca simultáneos) |
 | React | http://localhost:5173 | Frontend PKCE |
 | MailHog UI | http://localhost:8025 | Emails OTP de prueba |
 | PostgreSQL | localhost:5432 | keycloak / keycloak_dev_pass |

@@ -1,16 +1,17 @@
 """
-CONCEPTO: FastAPI Dependencies
+CONCEPT: FastAPI Dependencies
 
-En FastAPI las dependencias son funciones que se inyectan en los endpoints.
-Son el lugar correcto para poner logica de autenticacion/autorizacion.
+In FastAPI, dependencies are functions injected into endpoints.
+They are the right place for authentication and authorization logic.
 
-Ventajas:
-- Reutilizables en multiples endpoints
-- Testeables independientemente
-- Declarativas: el endpoint dice QUE necesita, no COMO obtenerlo
+Advantages:
+- Reusable across multiple endpoints
+- Testable independently
+- Declarative: the endpoint says WHAT it needs, not HOW to get it
 
-ENTREVISTA: "¿Como implementas RBAC en FastAPI?"
-→ Con dependencies que extraen roles del JWT y lanzan 403 si no tiene el rol requerido.
+INTERVIEW: "How do you implement RBAC in FastAPI?"
+→ With dependencies that extract roles from the JWT and raise 403 if the
+  required role is absent.
 """
 
 from fastapi import Depends, HTTPException, status
@@ -19,30 +20,30 @@ from dataclasses import dataclass
 
 from altana.auth.keycloak import decode_token
 
-# Extrae el Bearer token del header Authorization
+# Extracts the Bearer token from the Authorization header
 bearer_scheme = HTTPBearer()
 
 
 @dataclass
 class TokenData:
-    """Datos del usuario autenticado extraidos del JWT."""
-    sub: str           # ID unico del usuario en Keycloak
+    """Authenticated user data extracted from the JWT."""
+    sub: str           # unique user ID in Keycloak
     username: str      # preferred_username
     email: str | None
     roles: list[str]   # realm roles
-    tenant_id: str | None  # B2B2C: empresa de origen (ej: "toyota")
+    tenant_id: str | None  # B2B2C: originating company (e.g. "toyota")
     user_type: str | None  # B2B2C: "employee" | "customer" | None
-    raw: dict          # payload completo por si necesitas algo mas
+    raw: dict          # full payload for anything else you need
 
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
 ) -> TokenData:
     """
-    Dependency: extrae y valida el token del header Authorization.
-    Usar en cualquier endpoint que requiera autenticacion.
+    Dependency: extracts and validates the token from the Authorization header.
+    Use on any endpoint that requires authentication.
 
-    Uso:
+    Usage:
         @app.get("/me")
         async def me(user: TokenData = Depends(get_current_user)):
             return {"username": user.username}
@@ -62,12 +63,12 @@ async def get_current_user(
 
 def require_role(*roles: str):
     """
-    Dependency factory: crea una dependencia que requiere al menos uno de los roles.
+    Dependency factory: creates a dependency that requires at least one of the given roles.
 
-    CONCEPTO: dependency factory — funcion que retorna una dependency.
-    Permite parametrizar la logica de autorizacion.
+    CONCEPT: dependency factory — a function that returns a dependency.
+    Allows parameterising the authorisation logic.
 
-    Uso:
+    Usage:
         @app.get("/admin")
         async def admin(user = Depends(require_role("ROLE_ADMIN"))):
             ...
@@ -82,8 +83,8 @@ def require_role(*roles: str):
         if not any(role in user.roles for role in roles):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Se requiere uno de estos roles: {list(roles)}. "
-                       f"Roles del usuario: {user.roles}",
+                detail=f"One of these roles is required: {list(roles)}. "
+                       f"User roles: {user.roles}",
             )
         return user
 

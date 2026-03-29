@@ -1,22 +1,22 @@
 package com.altana.keycloak.authenticator;
 
 /*
- * CONCEPTO: AuthenticatorFactory — el par obligatorio de todo Authenticator
+ * CONCEPT: AuthenticatorFactory — the required companion of every Authenticator
  *
- * En el SPI de Keycloak, cada provider tiene dos clases:
- *   - La implementación:  AltanaOtpAuthenticator   (hace el trabajo)
- *   - La factory:        AltanaOtpAuthenticatorFactory (crea instancias + metadata)
+ * In the Keycloak SPI, every provider has two classes:
+ *   - The implementation:  AltanaOtpAuthenticator   (does the work)
+ *   - The factory:        AltanaOtpAuthenticatorFactory (creates instances + metadata)
  *
- * La Factory es lo que Keycloak registra y muestra en la UI de Admin.
- * Cuando el admin abre "Authentication → Flows → Add step", ve el
- * getDisplayType() de la factory.
+ * The Factory is what Keycloak registers and displays in the Admin UI.
+ * When an admin opens "Authentication → Flows → Add step", they see the
+ * getDisplayType() value from the factory.
  *
- * ENTREVISTA: ¿Por qué Keycloak usa el patrón Factory para los SPIs?
- * → Separa la configuración y el ciclo de vida (factory) de la lógica
- *   de negocio (authenticator). La factory es un singleton; el authenticator
- *   puede ser stateless (también singleton) o stateful (instancia por request).
- *   También permite que Keycloak descubra providers via ServiceLoader antes
- *   de crear instancias.
+ * INTERVIEW: Why does Keycloak use the Factory pattern for SPIs?
+ * → It separates configuration and lifecycle (factory) from business logic
+ *   (authenticator). The factory is a singleton; the authenticator can be
+ *   stateless (also singleton) or stateful (instance per request).
+ *   It also allows Keycloak to discover providers via ServiceLoader before
+ *   creating any instances.
  */
 
 import org.keycloak.Config;
@@ -34,9 +34,9 @@ public class AltanaOtpAuthenticatorFactory implements AuthenticatorFactory {
     public static final String PROVIDER_ID = "altana-otp-authenticator";
 
     /*
-     * El Authenticator es stateless (no guarda estado en campos de instancia —
-     * todo el estado va en AuthenticationSession via auth notes).
-     * Por eso podemos usar un singleton seguro para todos los requests.
+     * The Authenticator is stateless (it holds no state in instance fields —
+     * all state goes into AuthenticationSession via auth notes).
+     * Therefore we can safely share a single instance across all requests.
      */
     private static final AltanaOtpAuthenticator INSTANCE = new AltanaOtpAuthenticator();
 
@@ -47,27 +47,27 @@ public class AltanaOtpAuthenticatorFactory implements AuthenticatorFactory {
 
     @Override
     public String getDisplayType() {
-        return "Altana OTP (Email / SMS)";  // lo que ve el admin en la UI
+        return "Altana OTP (Email / SMS)";  // label the admin sees in the UI
     }
 
     @Override
     public String getHelpText() {
-        return "Envia un OTP de 6 digitos por Email (real via SMTP) o SMS (simulado). " +
-               "El usuario elige el canal preferido en cada login.";
+        return "Sends a 6-digit OTP via Email (real SMTP) or SMS (simulated). " +
+               "The user chooses the preferred channel on each login.";
     }
 
     @Override
     public String getReferenceCategory() {
-        return "otp";  // agrupa el authenticator en la categoría OTP de la UI
+        return "otp";  // groups this authenticator under the OTP category in the UI
     }
 
     @Override
     public boolean isConfigurable() {
         return false;
         /*
-         * Si fuera true, el admin podría configurar propiedades al agregar el paso.
-         * Por ejemplo: max intentos, longitud del OTP, proveedor de SMS.
-         * Para hacerlo configurable: retornar true + implementar getConfigProperties()
+         * If true, the admin could configure properties when adding the step.
+         * For example: max retries, OTP length, SMS provider.
+         * To make it configurable: return true + implement getConfigProperties()
          */
     }
 
@@ -75,20 +75,20 @@ public class AltanaOtpAuthenticatorFactory implements AuthenticatorFactory {
     public boolean isUserSetupAllowed() {
         return false;
         /*
-         * Si fuera true, el usuario podría configurar este factor desde su perfil.
-         * Ejemplo: "enrollar" un número de teléfono para SMS.
-         * Lo dejamos false — asumimos que phone_number ya está en el perfil.
+         * If true, the user could configure this factor from their profile.
+         * Example: enrol a phone number for SMS.
+         * Kept false — we assume phone_number is already set on the profile.
          */
     }
 
     @Override
     public AuthenticationExecutionModel.Requirement[] getRequirementChoices() {
         /*
-         * Define qué opciones tiene el admin al agregar este paso al flujo:
-         * REQUIRED  = siempre se ejecuta (obligatorio)
-         * ALTERNATIVE = se ejecuta si ningún otro paso alternativo fue suficiente
-         * CONDITIONAL = se ejecuta solo si se cumple una condición
-         * DISABLED  = existe pero no se ejecuta
+         * Defines which options the admin has when adding this step to a flow:
+         * REQUIRED    = always executed (mandatory)
+         * ALTERNATIVE = executed if no other alternative step was sufficient
+         * CONDITIONAL = executed only when a condition is met
+         * DISABLED    = present but not executed
          */
         return new AuthenticationExecutionModel.Requirement[] {
             AuthenticationExecutionModel.Requirement.REQUIRED,
@@ -100,7 +100,7 @@ public class AltanaOtpAuthenticatorFactory implements AuthenticatorFactory {
     @Override
     public List<ProviderConfigProperty> getConfigProperties() {
         /*
-         * Si isConfigurable() fuera true, aquí declararías los campos:
+         * If isConfigurable() were true, you would declare fields here:
          *
          * return List.of(
          *     new ProviderConfigProperty("sms_provider", "SMS Provider",
@@ -116,7 +116,7 @@ public class AltanaOtpAuthenticatorFactory implements AuthenticatorFactory {
 
     @Override
     public Authenticator create(KeycloakSession session) {
-        return INSTANCE;  // stateless → mismo objeto para todos
+        return INSTANCE;  // stateless → same object for everyone
     }
 
     @Override public void init(Config.Scope config) {}

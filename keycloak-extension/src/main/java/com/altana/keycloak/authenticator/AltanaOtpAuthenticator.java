@@ -2,45 +2,45 @@ package com.altana.keycloak.authenticator;
 
 /*
  * ============================================================
- * CONCEPTO: Custom Authenticator SPI
+ * CONCEPT: Custom Authenticator SPI
  * ============================================================
  *
- * Un Authenticator es un PASO dentro de un flujo de autenticación.
- * Keycloak tiene flujos (Browser Flow, Direct Grant Flow, etc.)
- * y cada paso del flujo es un Authenticator.
+ * An Authenticator is a STEP inside an authentication flow.
+ * Keycloak has flows (Browser Flow, Direct Grant Flow, etc.)
+ * and each step in the flow is an Authenticator.
  *
- * Flujo estándar "Browser" de Keycloak:
+ * Standard Keycloak "Browser" flow:
  *   1. Cookie check
- *   2. Kerberos (skip si no aplica)
- *   3. Username + Password   ← paso estándar
- *   4. [NUESTRO PASO] OTP por Email o SMS   ← lo que vamos a agregar
- *   5. Success → emite el token
+ *   2. Kerberos (skip if not applicable)
+ *   3. Username + Password   ← standard step
+ *   4. [OUR STEP] OTP via Email or SMS   ← what we add
+ *   5. Success → issues the token
  *
- * Ciclo de vida del Authenticator:
+ * Authenticator lifecycle:
  *
- *   authenticate(context) → se llama cuando el flujo llega a este paso
- *       └─ Generalmente muestra un formulario con context.challenge(response)
+ *   authenticate(context) → called when the flow reaches this step
+ *       └─ Typically shows a form with context.challenge(response)
  *
- *   action(context) → se llama cuando el usuario envía el formulario
- *       └─ Procesa la respuesta:
- *           context.success()  → paso superado, flujo continúa
- *           context.challenge() → vuelve a mostrar el formulario (con error)
- *           context.failure()  → autenticación fallida, flujo termina
+ *   action(context) → called when the user submits the form
+ *       └─ Processes the response:
+ *           context.success()  → step passed, flow continues
+ *           context.challenge() → re-show the form (with error)
+ *           context.failure()  → authentication failed, flow ends
  *
- * MÁQUINA DE ESTADOS (usamos auth notes para guardar estado entre requests):
+ * STATE MACHINE (we use auth notes to persist state between requests):
  *
- *   ESTADO 1: otp_method == null
- *       → mostrar formulario de selección de método
+ *   STATE 1: otp_method == null
+ *       → show method selection form
  *
- *   ESTADO 2: otp_method != null, otp_code != null
- *       → OTP ya enviado, mostrar formulario de ingreso de código
+ *   STATE 2: otp_method != null, otp_code != null
+ *       → OTP already sent, show code entry form
  *
- * Auth Notes: datos almacenados en la sesión de autenticación (no en el token).
- * Son efímeros — existen solo durante el flujo de login.
+ * Auth Notes: data stored in the authentication session (not in the token).
+ * They are ephemeral — they exist only for the duration of the login flow.
  *
- * ENTREVISTA: ¿Dónde guardas estado temporal durante un flujo de autenticación?
- * → En AuthenticationSession via setAuthNote() / getAuthNote().
- *   Son específicos del flujo, no van al token, y expiran con la sesión.
+ * INTERVIEW: Where do you store temporary state during an authentication flow?
+ * → In AuthenticationSession via setAuthNote() / getAuthNote().
+ *   They are flow-scoped, do not end up in the token, and expire with the session.
  *
  * ============================================================
  */
@@ -59,89 +59,89 @@ import java.time.Instant;
 
 public class AltanaOtpAuthenticator implements Authenticator {
 
-    // ─── Claves para auth notes (estado del flujo) ────────────────────────────
+    // ─── Auth note keys (flow state) ─────────────────────────────────────────
 
     static final String NOTE_OTP_METHOD = "altana_otp_method";   // "email" | "sms"
     static final String NOTE_OTP_CODE   = "altana_otp_code";     // "348291"
     static final String NOTE_OTP_EXPIRY = "altana_otp_expiry";   // unix timestamp
 
-    private static final int OTP_EXPIRY_SECONDS = 300;  // 5 minutos
+    private static final int OTP_EXPIRY_SECONDS = 300;  // 5 minutes
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    // ─── authenticate() — primera vez que Keycloak llega a este paso ──────────
+    // ─── authenticate() — first time Keycloak reaches this step ──────────────
 
     @Override
     public void authenticate(AuthenticationFlowContext context) {
         String otpMethod = context.getAuthenticationSession().getAuthNote(NOTE_OTP_METHOD);
 
         if (otpMethod == null) {
-            // Estado 1: el usuario aún no eligió método → mostrar selección
+            // State 1: user has not yet chosen a method → show selection form
             showMethodSelectionForm(context, null);
         } else {
-            // Estado 2: OTP ya fue enviado (ej: usuario recargó la página)
+            // State 2: OTP already sent (e.g. user refreshed the page)
             showOtpEntryForm(context, otpMethod, null);
         }
     }
 
-    // ─── action() — el usuario envió un formulario ────────────────────────────
+    // ─── action() — user submitted a form ────────────────────────────────────
 
     @Override
     public void action(AuthenticationFlowContext context) {
         String formAction = getFormParam(context, "form_action");
         String otpMethod  = context.getAuthenticationSession().getAuthNote(NOTE_OTP_METHOD);
 
-        // El usuario clickeó "Cambiar método" desde el form de ingreso de código
+        // User clicked "Change method" from the code entry form
         if ("change_method".equals(formAction)) {
             clearOtpNotes(context);
             showMethodSelectionForm(context, null);
             return;
         }
 
-        // El usuario quiere reenviar el código
+        // User wants to resend the code
         if ("resend".equals(formAction)) {
             resendOtp(context, otpMethod);
             return;
         }
 
         if (otpMethod == null) {
-            // Procesando el formulario de SELECCIÓN DE MÉTODO
+            // Processing the METHOD SELECTION form
             processMethodSelection(context);
         } else {
-            // Procesando el formulario de INGRESO DE CÓDIGO
+            // Processing the CODE ENTRY form
             processOtpEntry(context, otpMethod);
         }
     }
 
-    // ─── Lógica: selección de método ──────────────────────────────────────────
+    // ─── Logic: method selection ──────────────────────────────────────────────
 
     private void processMethodSelection(AuthenticationFlowContext context) {
         String selectedMethod = getFormParam(context, "otp_method");
 
         if (!"email".equals(selectedMethod) && !"sms".equals(selectedMethod)) {
-            showMethodSelectionForm(context, "Debes seleccionar un método");
+            showMethodSelectionForm(context, "You must select a method");
             return;
         }
 
-        // Validar que el usuario tenga el dato necesario
+        // Validate that the user has the required contact detail
         if ("email".equals(selectedMethod) && context.getUser().getEmail() == null) {
-            showMethodSelectionForm(context, "Tu cuenta no tiene email registrado");
+            showMethodSelectionForm(context, "Your account has no registered email");
             return;
         }
         if ("sms".equals(selectedMethod) &&
                 context.getUser().getFirstAttribute("phone_number") == null) {
-            showMethodSelectionForm(context, "Tu cuenta no tiene número de teléfono registrado");
+            showMethodSelectionForm(context, "Your account has no registered phone number");
             return;
         }
 
         String otpCode = generateOtp();
         long   expiry  = Instant.now().getEpochSecond() + OTP_EXPIRY_SECONDS;
 
-        // Guardar estado en la sesión de autenticación
+        // Persist state in the authentication session
         context.getAuthenticationSession().setAuthNote(NOTE_OTP_METHOD, selectedMethod);
         context.getAuthenticationSession().setAuthNote(NOTE_OTP_CODE,   otpCode);
         context.getAuthenticationSession().setAuthNote(NOTE_OTP_EXPIRY, String.valueOf(expiry));
 
-        // Enviar OTP
+        // Send OTP
         try {
             if ("email".equals(selectedMethod)) {
                 sendOtpByEmail(context, otpCode);
@@ -149,49 +149,49 @@ public class AltanaOtpAuthenticator implements Authenticator {
                 sendOtpBySms(context, otpCode);
             }
         } catch (Exception e) {
-            // Si falla el envío, limpiar estado y mostrar error
+            // If sending fails, clear state and show error
             clearOtpNotes(context);
-            showMethodSelectionForm(context, "Error al enviar el código. Intenta de nuevo.");
+            showMethodSelectionForm(context, "Failed to send the code. Please try again.");
             return;
         }
 
         showOtpEntryForm(context, selectedMethod, null);
     }
 
-    // ─── Lógica: validación del código ────────────────────────────────────────
+    // ─── Logic: code validation ───────────────────────────────────────────────
 
     private void processOtpEntry(AuthenticationFlowContext context, String otpMethod) {
         String enteredOtp  = getFormParam(context, "otp_code");
         String storedOtp   = context.getAuthenticationSession().getAuthNote(NOTE_OTP_CODE);
         String expiryStr   = context.getAuthenticationSession().getAuthNote(NOTE_OTP_EXPIRY);
 
-        // Validar expiración
+        // Check expiry
         if (expiryStr == null || Instant.now().getEpochSecond() > Long.parseLong(expiryStr)) {
             clearOtpNotes(context);
-            showMethodSelectionForm(context, "El codigo expiro (5 min). Solicita uno nuevo.");
+            showMethodSelectionForm(context, "Code expired (5 min). Please request a new one.");
             return;
         }
 
-        // Validar código
+        // Validate code
         if (storedOtp != null && storedOtp.equals(enteredOtp)) {
             /*
-             * ENTREVISTA: ¿Qué hace context.success()?
-             * → Le indica al flujo de autenticación que este paso fue superado.
-             *   Keycloak avanza al siguiente paso del flujo, o si era el último,
-             *   emite el token y redirige al cliente.
+             * INTERVIEW: What does context.success() do?
+             * → It tells the authentication flow that this step has passed.
+             *   Keycloak advances to the next step in the flow, or if this was
+             *   the last step, issues the token and redirects to the client.
              */
             context.success();
         } else {
             /*
              * context.failure() vs context.challenge():
-             *   failure()   → autenticación terminada, muestra página de error
-             *   challenge() → vuelve a mostrar un formulario (el usuario puede reintentar)
+             *   failure()   → authentication ended, shows an error page
+             *   challenge() → re-shows a form (user can retry)
              */
-            showOtpEntryForm(context, otpMethod, "Codigo incorrecto. Intenta de nuevo.");
+            showOtpEntryForm(context, otpMethod, "Incorrect code. Please try again.");
         }
     }
 
-    // ─── Reenviar código ──────────────────────────────────────────────────────
+    // ─── Resend code ──────────────────────────────────────────────────────────
 
     private void resendOtp(AuthenticationFlowContext context, String otpMethod) {
         String newCode = generateOtp();
@@ -209,32 +209,32 @@ public class AltanaOtpAuthenticator implements Authenticator {
             showOtpEntryForm(context, otpMethod, null);
         } catch (Exception e) {
             clearOtpNotes(context);
-            showMethodSelectionForm(context, "Error al reenviar el codigo.");
+            showMethodSelectionForm(context, "Failed to resend the code.");
         }
     }
 
-    // ─── Envío de OTP por Email (real via SMTP → MailHog en dev) ─────────────
+    // ─── Send OTP by email (real via SMTP → MailHog in dev) ──────────────────
 
     private void sendOtpByEmail(AuthenticationFlowContext context, String otpCode) throws Exception {
         /*
-         * CONCEPTO: EmailSenderProvider es el SPI de email de Keycloak.
-         * En dev usamos MailHog (puerto 1025). En prod: SendGrid, SES, etc.
-         * La config SMTP viene del realm (Realm Settings → Email tab).
+         * CONCEPT: EmailSenderProvider is Keycloak's email SPI.
+         * In dev we use MailHog (port 1025). In prod: SendGrid, SES, etc.
+         * SMTP configuration comes from the realm (Realm Settings → Email tab).
          *
-         * ENTREVISTA: ¿Cómo envías emails desde una extensión de Keycloak?
-         * → Via EmailSenderProvider, que usa la config SMTP del realm.
-         *   Así el admin puede cambiar el servidor de email sin tocar el código.
+         * INTERVIEW: How do you send emails from a Keycloak extension?
+         * → Via EmailSenderProvider, which uses the realm SMTP configuration.
+         *   This lets the admin change the mail server without touching code.
          */
-        String subject = "[Altana] Tu codigo de verificacion";
+        String subject = "[Altana] Your verification code";
         String html = String.format("""
             <html><body style='font-family:sans-serif; max-width:500px; margin:auto'>
-              <h2 style='color:#1a73e8'>Verificacion en dos pasos</h2>
-              <p>Hola <strong>%s</strong>,</p>
-              <p>Tu codigo de verificacion es:</p>
+              <h2 style='color:#1a73e8'>Two-step verification</h2>
+              <p>Hello <strong>%s</strong>,</p>
+              <p>Your verification code is:</p>
               <div style='font-size:36px; font-weight:bold; letter-spacing:8px;
                           background:#f0f4ff; padding:20px; text-align:center;
                           border-radius:8px; margin:20px 0'>%s</div>
-              <p style='color:#666'>Expira en 5 minutos. No lo compartas con nadie.</p>
+              <p style='color:#666'>Expires in 5 minutes. Do not share it with anyone.</p>
               <hr style='border:none; border-top:1px solid #eee'>
               <p style='color:#999; font-size:0.8em'>Altana Supply Chain Analytics</p>
             </body></html>
@@ -247,54 +247,54 @@ public class AltanaOtpAuthenticator implements Authenticator {
             context.getRealm().getSmtpConfig(),
             context.getUser(),
             subject,
-            null,   // texto plano (opcional)
+            null,   // plain text (optional)
             html
         );
 
-        System.out.printf("[ALTANA-EMAIL] OTP %s enviado a %s%n",
+        System.out.printf("[ALTANA-EMAIL] OTP %s sent to %s%n",
             otpCode, context.getUser().getEmail());
     }
 
-    // ─── Envío de OTP por SMS (simulado) ──────────────────────────────────────
+    // ─── Send OTP by SMS (simulated) ──────────────────────────────────────────
 
     private void sendOtpBySms(AuthenticationFlowContext context, String otpCode) {
         /*
-         * CONCEPTO: SMS simulado — en producción aquí va:
+         * CONCEPT: Simulated SMS — in production this would be:
          *   - Twilio: twilio.com/docs/sms
          *   - AWS SNS: sdk PublishRequest
          *   - Vonage / Infobip / etc.
          *
-         * Lo importante es que la interfaz del authenticator no cambia.
-         * Solo cambias la implementación de este método.
+         * The authenticator interface stays the same.
+         * Only this method's implementation changes.
          *
-         * ENTREVISTA: ¿Cómo estructurarías la integración con Twilio?
-         * → Creando un SmsService (interfaz) con una implementación TwilioSmsService.
-         *   Las credenciales (account_sid, auth_token) van en las config properties
-         *   del authenticator (getConfigProperties()), no hardcodeadas.
-         *   El admin las configura en la UI de Keycloak al agregar el paso al flujo.
+         * INTERVIEW: How would you structure a Twilio integration?
+         * → Create an SmsService interface with a TwilioSmsService implementation.
+         *   Credentials (account_sid, auth_token) go in the authenticator's
+         *   getConfigProperties(), not hardcoded.
+         *   The admin configures them in the Keycloak UI when adding the step.
          */
         String phone = context.getUser().getFirstAttribute("phone_number");
 
-        // Simular envío — en Docker esto aparece en: docker logs altana-keycloak
+        // Simulated send — visible in Docker via: docker logs altana-keycloak
         System.out.printf(
-            "[ALTANA-SMS] === SIMULACION SMS ===%n" +
-            "  Para:    %s%n" +
-            "  Usuario: %s%n" +
-            "  Mensaje: Tu codigo Altana es: %s (expira en 5 min)%n" +
+            "[ALTANA-SMS] === SMS SIMULATION ===%n" +
+            "  To:      %s%n" +
+            "  User:    %s%n" +
+            "  Message: Your Altana code is: %s (expires in 5 min)%n" +
             "[ALTANA-SMS] =====================%n",
             phone, context.getUser().getUsername(), otpCode
         );
     }
 
-    // ─── Formularios (FTL templates) ──────────────────────────────────────────
+    // ─── Forms (FTL templates) ────────────────────────────────────────────────
 
     private void showMethodSelectionForm(AuthenticationFlowContext context, String error) {
         /*
-         * context.form() devuelve un LoginFormsProvider.
-         * .setAttribute() → inyecta variables disponibles en el FTL
-         * .setError()      → muestra mensaje de error en el formulario
-         * .createForm()    → renderiza el template FTL del tema activo
-         * context.challenge(response) → le dice al flujo "espera input del usuario"
+         * context.form() returns a LoginFormsProvider.
+         * .setAttribute() → injects variables available in the FTL template
+         * .setError()      → displays an error message in the form
+         * .createForm()    → renders the FTL template from the active theme
+         * context.challenge(response) → tells the flow "wait for user input"
          */
         var form = context.form();
         if (error != null) form = form.setError(error);
@@ -316,7 +316,7 @@ public class AltanaOtpAuthenticator implements Authenticator {
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
     private String generateOtp() {
-        // 6 dígitos: [100000, 999999]
+        // 6 digits: [100000, 999999]
         return String.valueOf(100000 + RANDOM.nextInt(900000));
     }
 
@@ -344,26 +344,26 @@ public class AltanaOtpAuthenticator implements Authenticator {
         context.getAuthenticationSession().removeAuthNote(NOTE_OTP_EXPIRY);
     }
 
-    // ─── Métodos requeridos por la interfaz ───────────────────────────────────
+    // ─── Required interface methods ───────────────────────────────────────────
 
     @Override
     public boolean requiresUser() {
-        // true = este paso requiere que el usuario ya esté identificado
-        // (viene DESPUÉS del paso de username+password)
+        // true = this step requires the user to already be identified
+        // (it comes AFTER the username+password step)
         return true;
     }
 
     @Override
     public boolean configuredFor(KeycloakSession session, RealmModel realm, UserModel user) {
-        // true = este authenticator aplica para todos los usuarios
-        // Podrías retornar false para usuarios con 2FA ya configurado de otra forma
+        // true = this authenticator applies to all users
+        // You could return false for users who already have another 2FA configured
         return true;
     }
 
     @Override
     public void setRequiredActions(KeycloakSession session, RealmModel realm, UserModel user) {
-        // Aquí podrías agregar required actions si el usuario necesita configurar algo
-        // Por ejemplo: pedirle que registre su teléfono si no tiene phone_number
+        // Here you could add required actions if the user needs to configure something.
+        // Example: prompt them to register a phone number if they have no phone_number.
     }
 
     @Override

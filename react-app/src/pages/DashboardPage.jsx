@@ -5,8 +5,7 @@
 
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-
-const API_URL = 'http://localhost:8081';
+import { API_URL } from '../config';
 
 export default function DashboardPage() {
   const { user, logout, getAccessToken } = useAuth();

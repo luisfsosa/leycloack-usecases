@@ -1,8 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth/AuthContext';
-import HomePage      from './pages/HomePage';
-import CallbackPage  from './pages/CallbackPage';
-import DashboardPage from './pages/DashboardPage';
+import HomePage              from './pages/HomePage';
+import CallbackPage          from './pages/CallbackPage';
+import DashboardPage         from './pages/DashboardPage';
+import AcceptInvitePage      from './pages/AcceptInvitePage';
+import SupplierDashboardPage from './pages/SupplierDashboardPage';
 
 /**
  * ProtectedRoute — redirige a / si el usuario no está autenticado.
@@ -26,6 +28,10 @@ export default function App() {
           <Route path="/callback"  element={<CallbackPage />} />
           <Route path="/dashboard" element={
             <ProtectedRoute><DashboardPage /></ProtectedRoute>
+          } />
+          <Route path="/accept-invite" element={<AcceptInvitePage />} />
+          <Route path="/supplier/dashboard" element={
+            <ProtectedRoute><SupplierDashboardPage /></ProtectedRoute>
           } />
         </Routes>
       </AuthProvider>

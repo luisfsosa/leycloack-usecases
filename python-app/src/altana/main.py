@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import jwt as pyjwt
 import httpx
 
-from altana.routers import supply_chain
+from altana.routers import supply_chain, invitations, supplier
 from altana.config import settings
 
 app = FastAPI(title="Altana Supply Chain API")
@@ -21,6 +21,8 @@ app.add_middleware(
 )
 
 app.include_router(supply_chain.router)
+app.include_router(invitations.router)
+app.include_router(supplier.router)
 
 
 @app.get("/")
