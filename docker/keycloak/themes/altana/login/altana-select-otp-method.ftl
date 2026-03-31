@@ -3,7 +3,7 @@
 <@layout.registrationLayout displayMessage=true; section>
 
     <#if section = "header">
-        Verificacion en dos pasos
+        Two-step verification
 
     <#elseif section = "form">
         <form id="altana-select-method-form"
@@ -12,10 +12,10 @@
 
             <div class="${properties.kcFormGroupClass!}">
                 <p style="margin-bottom: 16px; color: #555;">
-                    Elige como quieres recibir tu codigo de verificacion:
+                    Choose how you want to receive your verification code:
                 </p>
 
-                <#-- Opcion Email -->
+                <#-- Email option -->
                 <label style="
                     display: block;
                     padding: 14px 16px;
@@ -30,13 +30,13 @@
                            value="email"
                            checked
                            style="margin-right: 10px;" />
-                    <strong>Correo electronico</strong>
+                    <strong>Email</strong>
                     <span style="display:block; color:#888; font-size:0.85em; margin-top:4px; margin-left:22px;">
-                        Enviamos el codigo a tu email registrado
+                        We will send the code to your registered email address
                     </span>
                 </label>
 
-                <#-- Opcion SMS -->
+                <#-- SMS option -->
                 <label style="
                     display: block;
                     padding: 14px 16px;
@@ -52,7 +52,7 @@
                            style="margin-right: 10px;" />
                     <strong>SMS</strong>
                     <span style="display:block; color:#888; font-size:0.85em; margin-top:4px; margin-left:22px;">
-                        Enviamos el codigo a tu numero de telefono registrado
+                        We will send the code to your registered phone number
                     </span>
                 </label>
             </div>
@@ -62,7 +62,7 @@
             <div class="${properties.kcFormGroupClass!}">
                 <input class="${properties.kcButtonClass!} ${properties.kcButtonPrimaryClass!} ${properties.kcButtonBlockClass!} ${properties.kcButtonLargeClass!}"
                        type="submit"
-                       value="Enviar codigo" />
+                       value="Send code" />
             </div>
 
         </form>

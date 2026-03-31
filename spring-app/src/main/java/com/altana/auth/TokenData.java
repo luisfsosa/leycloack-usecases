@@ -3,9 +3,9 @@ package com.altana.auth;
 import java.util.List;
 
 /*
- * CONCEPTO: Java Record (Java 16+)
- * Clase inmutable con constructor, getters, equals/hashCode/toString automáticos.
- * Equivalente al @dataclass de Python.
+ * CONCEPT: Java Record (Java 16+)
+ * Immutable class with constructor, getters, equals/hashCode/toString generated automatically.
+ * Equivalent to Python's @dataclass.
  */
 public record TokenData(
         String sub,

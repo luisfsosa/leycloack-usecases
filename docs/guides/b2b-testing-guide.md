@@ -1,27 +1,27 @@
-# Guía de pruebas B2B — Identity Brokering
+# B2B Testing Guide — Identity Brokering
 
-> Esta guía explica cómo reproducir el flujo B2B completo desde cero usando
-> los scripts del proyecto. Úsala cada vez que quieras testear el patrón
-> B2B de toyota-corp → altana-dev → FastAPI.
+> This guide explains how to reproduce the complete B2B flow from scratch using
+> the project scripts. Use it whenever you want to test the
+> toyota-corp → altana-dev → FastAPI B2B pattern.
 
 ---
 
-## Prerequisitos — verificar antes de empezar
+## Prerequisites — check before starting
 
 ```powershell
-# 1. Keycloak corriendo
+# 1. Keycloak running
 curl http://localhost:8080/realms/altana-dev/.well-known/openid-configuration
-# debe responder JSON con "issuer": "http://localhost:8080/realms/altana-dev"
+# should respond with JSON containing "issuer": "http://localhost:8080/realms/altana-dev"
 
-# 2. FastAPI corriendo (en otro terminal)
+# 2. FastAPI running (in another terminal)
 # cd python-app\src
 # uvicorn altana.main:app --reload --port 8003
 
-# 3. Verificar que toyota-corp IDP existe en altana-dev
-# (si no existe, ver sección "Setup desde cero" al final de esta guía)
+# 3. Verify that the toyota-corp IDP exists in altana-dev
+# (if it doesn't, see the "Setup from scratch" section at the end of this guide)
 ```
 
-Si Keycloak no está corriendo:
+If Keycloak is not running:
 ```powershell
 cd docker
 docker compose up -d
@@ -29,68 +29,68 @@ docker compose up -d
 
 ---
 
-## Flujo de prueba — paso a paso
+## Test flow — step by step
 
-### Terminal 1 — Servidor de captura del callback
+### Terminal 1 — Callback capture server
 
-Déjalo corriendo durante toda la prueba. Captura el `code` automáticamente
-cuando Keycloak redirige de vuelta después del login.
+Leave it running throughout the test. It captures the `code` automatically
+when Keycloak redirects back after login.
 
 ```powershell
 python scripts\capture_callback.py
 ```
 
-Verás:
+You will see:
 ```
-Servidor de captura escuchando en http://localhost:3000
-Esperando callback de Keycloak...
+Capture server listening on http://localhost:3000
+Waiting for Keycloak callback...
 ```
 
 ---
 
-### Terminal 2 — Generar URL de autorización PKCE
+### Terminal 2 — Generate PKCE authorization URL
 
 ```powershell
 python scripts\generate_b2b_url.py
 ```
 
-El script imprime tres secciones:
+The script prints three sections:
 
 ```
 ======================================================================
-PKCE VALUES (guárdalos para el exchange):
-  code_verifier  : abc123...    ← ANÓTALO, lo necesitas para el exchange
+PKCE VALUES (save for the exchange):
+  code_verifier  : abc123...    ← NOTE THIS, needed for the exchange
   code_challenge : xyz789...
   state          : qrs456...
 
 ======================================================================
-AUTHORIZATION URL (copia y pega en el browser):
+AUTHORIZATION URL (copy and paste in the browser):
 
 http://localhost:8080/realms/altana-dev/...&kc_idp_hint=toyota-corp
 
 ======================================================================
-EXCHANGE COMMAND (referencia — usar exchange_code.py en Windows):
+EXCHANGE COMMAND (reference — use exchange_code.py on Windows):
   -d "code_verifier=abc123..."
 ```
 
-> **IMPORTANTE:** El `code_verifier` es de un solo uso y expira con el code
-> (300 segundos). Si el login tarda más, regenera con el mismo script.
+> **IMPORTANT:** The `code_verifier` is single-use and expires with the code
+> (300 seconds). If the login takes too long, regenerate with the same script.
 
 ---
 
-### Browser — Login B2B
+### Browser — B2B Login
 
-1. Copia el URL completo de la sección `AUTHORIZATION URL`
-2. Pégalo en el browser (**ventana incógnito** recomendado para evitar SSO)
-3. Keycloak redirige directo a toyota-corp (gracias a `kc_idp_hint`)
-4. Login con: `john.doe` / `toyota123`
-5. El browser redirige a `localhost:3000/callback?code=XXX&state=YYY`
+1. Copy the full URL from the `AUTHORIZATION URL` section
+2. Paste it in the browser (**incognito window** recommended to avoid SSO)
+3. Keycloak redirects directly to toyota-corp (thanks to `kc_idp_hint`)
+4. Login with: `john.doe` / `toyota123`
+5. The browser redirects to `localhost:3000/callback?code=XXX&state=YYY`
 
-**El Terminal 1 imprime automáticamente:**
+**Terminal 1 prints automatically:**
 ```
 ======================================================================
-CALLBACK CAPTURADO
-  code  : e81da983-ee62-...     ← cópialo
+CALLBACK CAPTURED
+  code  : e81da983-ee62-...     ← copy this
   state : qrs456...
 ======================================================================
 ```
@@ -103,23 +103,23 @@ CALLBACK CAPTURADO
 python scripts\exchange_code.py
 ```
 
-El script pregunta interactivamente:
+The script asks interactively:
 
 ```
 TOKEN EXCHANGE — Authorization Code → Tokens
 ============================================================
 
-Pega el code capturado:
-> e81da983-ee62-...      ← pega el code del Terminal 1
+Paste the captured code:
+> e81da983-ee62-...      ← paste the code from Terminal 1
 
-Pega el code_verifier (del script generate_b2b_url):
-> abc123...              ← pega el verifier de antes
+Paste the code_verifier (from generate_b2b_url script):
+> abc123...              ← paste the verifier from before
 ```
 
-**Salida esperada:**
+**Expected output:**
 ```
 ======================================================================
-TOKENS OBTENIDOS
+TOKENS OBTAINED
 ======================================================================
   token_type   : Bearer
   expires_in   : 300s
@@ -136,158 +136,158 @@ ACCESS TOKEN PAYLOAD
     "roles": [
       "default-roles-altana-dev",
       "offline_access",
-      "ROLE_ANALYST",            ← debe estar aquí
+      "ROLE_ANALYST",            ← must be here
       "uma_authorization"
     ]
   }
 }
 
 ======================================================================
-RESUMEN
+SUMMARY
 ======================================================================
-  Usuario : john.doe
-  Email   : john.doe@toyota.com
-  Issuer  : http://localhost:8080/realms/altana-dev
-  Roles   : ['default-roles-altana-dev', 'offline_access', 'ROLE_ANALYST', ...]
+  User   : john.doe
+  Email  : john.doe@toyota.com
+  Issuer : http://localhost:8080/realms/altana-dev
+  Roles  : ['default-roles-altana-dev', 'offline_access', 'ROLE_ANALYST', ...]
 
-[token guardado en scripts/.last_access_token]
+[token saved to scripts/.last_access_token]
 ```
 
 ---
 
-### Terminal 2 — Probar el token en FastAPI
+### Terminal 2 — Test the token against FastAPI
 
-El script `exchange_code.py` guarda el token en `scripts/.last_access_token`.
-Usarlo para llamar a los endpoints protegidos:
+The `exchange_code.py` script saves the token to `scripts/.last_access_token`.
+Use it to call protected endpoints:
 
 ```powershell
-# Leer el token guardado
+# Read the saved token
 $token = Get-Content scripts\.last_access_token
 
-# Endpoint público (sin auth)
+# Public endpoint (no auth)
 Invoke-WebRequest -Uri http://localhost:8003/supply-chain/health `
   | Select-Object -ExpandProperty Content
 
-# Endpoint autenticado — cualquier usuario con token válido
+# Authenticated endpoint — any user with a valid token
 Invoke-WebRequest -Uri http://localhost:8003/supply-chain/me `
   -Headers @{Authorization="Bearer $token"} `
   | Select-Object -ExpandProperty Content
 
-# Endpoint con ROLE_ANALYST (john.doe debería poder)
+# Endpoint requiring ROLE_ANALYST (john.doe should pass)
 Invoke-WebRequest -Uri http://localhost:8003/supply-chain/shipments `
   -Headers @{Authorization="Bearer $token"} `
   | Select-Object -ExpandProperty Content
 
-# Endpoint con ROLE_ADMIN (john.doe NO puede — esperar 403)
+# Endpoint requiring ROLE_ADMIN (john.doe cannot — expect 403)
 Invoke-WebRequest -Uri http://localhost:8003/supply-chain/suppliers/test-id `
   -Method Delete `
   -Headers @{Authorization="Bearer $token"} `
   | Select-Object -ExpandProperty Content
 ```
 
-**Resultados esperados:**
+**Expected results:**
 
 | Endpoint | john.doe (ROLE_ANALYST) |
 |----------|------------------------|
-| `GET /health` | ✅ 200 — público |
-| `GET /me` | ✅ 200 — autenticado |
-| `GET /shipments` | ✅ 200 — tiene ROLE_ANALYST |
-| `DELETE /suppliers/{id}` | ❌ 403 — requiere ROLE_ADMIN |
+| `GET /health` | ✅ 200 — public |
+| `GET /me` | ✅ 200 — authenticated |
+| `GET /shipments` | ✅ 200 — has ROLE_ANALYST |
+| `DELETE /suppliers/{id}` | ❌ 403 — requires ROLE_ADMIN |
 
 ---
 
-## Troubleshooting — problemas comunes
+## Troubleshooting — common issues
 
-### "State mismatch" o token expirado
+### "State mismatch" or expired token
 
-El code de autorización dura 300 segundos. Si pasó mucho tiempo:
+The authorization code expires in 300 seconds. If too much time has passed:
 ```powershell
-# Regenerar todo desde el paso 2
+# Regenerate everything from step 2
 python scripts\generate_b2b_url.py
 ```
 
-### "ROLE_ANALYST no aparece en el token"
+### "ROLE_ANALYST does not appear in the token"
 
-Significa que el mapper no corrió porque john.doe ya existía en altana-dev
-(IMPORT solo corre al crear el usuario):
+This means the mapper did not run because john.doe already existed in altana-dev
+(IMPORT only runs when the user is created):
 
 ```powershell
 python scripts\reset_b2b_user.py
 ```
 
-Luego volver al paso del browser y hacer login de nuevo.
+Then go back to the browser step and log in again.
 
-### "target is null" en los logs de Keycloak
+### "target is null" in Keycloak logs
 
-El mapper tiene un tipo incorrecto. Verificar:
+The mapper has an incorrect type. Verify:
 ```powershell
 python scripts\verify_b2b_setup.py
 ```
 
-### "connection refused" en localhost:3000
+### "connection refused" on localhost:3000
 
-El servidor de captura no está corriendo. Abrir Terminal 1 y ejecutar:
+The capture server is not running. Open Terminal 1 and run:
 ```powershell
 python scripts\capture_callback.py
 ```
 
-### john.doe no puede hacer login (credenciales incorrectas)
+### john.doe cannot log in (wrong credentials)
 
-Las credenciales en toyota-corp son `john.doe` / `toyota123`.
-Si el realm fue recreado, el password puede haberse perdido:
+The credentials in toyota-corp are `john.doe` / `toyota123`.
+If the realm was recreated, the password may have been lost:
 ```powershell
 python scripts\reset_toyota_user.py
 ```
 
 ---
 
-## Scripts de soporte
+## Support scripts
 
-| Script | Propósito |
-|--------|-----------|
-| `scripts\generate_b2b_url.py` | Genera PKCE + URL de autorización con kc_idp_hint |
-| `scripts\capture_callback.py` | Servidor HTTP en puerto 3000 que captura el code |
-| `scripts\exchange_code.py` | Intercambia code + verifier por tokens, muestra payload |
-| `scripts\reset_b2b_user.py` | Borra john.doe de altana-dev para forzar re-import |
-| `scripts\verify_b2b_setup.py` | Verifica que toda la config B2B esté correcta |
+| Script | Purpose |
+|--------|---------|
+| `scripts\generate_b2b_url.py` | Generates PKCE + authorization URL with kc_idp_hint |
+| `scripts\capture_callback.py` | HTTP server on port 3000 that captures the code |
+| `scripts\exchange_code.py` | Exchanges code + verifier for tokens, shows payload |
+| `scripts\reset_b2b_user.py` | Deletes john.doe from altana-dev to force re-import |
+| `scripts\verify_b2b_setup.py` | Verifies that the entire B2B configuration is correct |
 
 ---
 
-## Setup desde cero (si los realms no existen)
+## Setup from scratch (if realms do not exist)
 
-Si perdiste los datos de Keycloak (ej: recreaste los contenedores sin volumen
-persistente), ejecutar en orden:
+If you lost your Keycloak data (e.g.: recreated containers without a persistent volume),
+run in order:
 
 ```powershell
-# 1. Crear toyota-corp realm + usuario john.doe
+# 1. Create toyota-corp realm + user john.doe
 python scripts\setup_toyota_idp.py
 
-# 2. Verificar la config
+# 2. Verify the configuration
 python scripts\verify_b2b_setup.py
 
-# 3. Proceder con el flujo normal desde el paso 1
+# 3. Proceed with the normal flow from step 1
 ```
 
 ---
 
-## Referencia rápida — datos del entorno B2B
+## Quick reference — B2B environment data
 
 ```
 Keycloak:         http://localhost:8080
 Admin:            admin / admin
 
-Realm broker:     altana-dev
-  Cliente SPA:    altana-web (público, PKCE)
-  IDP registrado: toyota-corp (alias)
+Broker realm:     altana-dev
+  SPA client:     altana-web (public, PKCE)
+  Registered IDP: toyota-corp (alias)
   Mapper:         oidc-hardcoded-role-idp-mapper → ROLE_ANALYST
 
-Realm IDP ext:    toyota-corp (simula empresa cliente)
-  Cliente broker: altana-broker (secret: altana-broker-secret)
-  Usuario prueba: john.doe / toyota123
+External IDP:     toyota-corp (simulates enterprise client)
+  Broker client:  altana-broker (secret: altana-broker-secret)
+  Test user:      john.doe / toyota123
 
 FastAPI:          http://localhost:8003
-  /supply-chain/health     → público
-  /supply-chain/me         → cualquier token válido
-  /supply-chain/shipments  → ROLE_ANALYST o ROLE_ADMIN
-  /supply-chain/suppliers  → DELETE requiere ROLE_ADMIN
+  /supply-chain/health     → public
+  /supply-chain/me         → any valid token
+  /supply-chain/shipments  → ROLE_ANALYST or ROLE_ADMIN
+  /supply-chain/suppliers  → DELETE requires ROLE_ADMIN
 ```

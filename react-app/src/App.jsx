@@ -7,14 +7,14 @@ import AcceptInvitePage      from './pages/AcceptInvitePage';
 import SupplierDashboardPage from './pages/SupplierDashboardPage';
 
 /**
- * ProtectedRoute — redirige a / si el usuario no está autenticado.
+ * ProtectedRoute — redirects to / if the user is not authenticated.
  *
- * CONCEPTO: Route Guard en React
- * Verifica si hay sesión activa antes de renderizar el componente.
+ * CONCEPT: Route Guard in React
+ * Checks for an active session before rendering the component.
  */
 function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
-  if (loading) return <p style={{ textAlign: 'center', marginTop: '20%' }}>Cargando...</p>;
+  if (loading) return <p style={{ textAlign: 'center', marginTop: '20%' }}>Loading...</p>;
   if (!isAuthenticated) return <Navigate to="/" replace />;
   return children;
 }

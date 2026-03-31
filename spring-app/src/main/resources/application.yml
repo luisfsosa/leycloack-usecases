@@ -6,7 +6,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          # issuer-uri hace dos cosas:
-          # 1. Descarga las public keys via JWKS (para verificar firmas RS256)
-          # 2. Valida que el claim 'iss' del token coincida con esta URI
+          # issuer-uri does two things:
+          # 1. Downloads public keys via JWKS (to verify RS256 signatures)
+          # 2. Validates that the token 'iss' claim matches this URI
           issuer-uri: http://localhost:8080/realms/altana-dev

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Setup completo del patrón B2B Identity Brokering desde cero.
+Full setup of the B2B Identity Brokering pattern from scratch.
 
-Crea:
-  - Realm toyota-corp con usuario john.doe
-  - Cliente altana-broker en toyota-corp
-  - IDP toyota-corp en altana-dev
-  - Mapper email + mapper oidc-hardcoded-role-idp-mapper → ROLE_ANALYST
+Creates:
+  - Realm toyota-corp with user john.doe
+  - Client altana-broker in toyota-corp
+  - IDP toyota-corp in altana-dev
+  - Email mapper + oidc-hardcoded-role-idp-mapper → ROLE_ANALYST
 
-Idempotente: si algo ya existe, lo omite sin error.
+Idempotent: if something already exists, it is skipped without error.
 """
 import urllib.request, urllib.parse, json
 
@@ -53,11 +53,11 @@ if status == 404:
         "sslRequired": "external",
         "accessTokenLifespan": 300
     }, token=token)
-    print(f"[{s}] Realm toyota-corp creado")
+    print(f"[{s}] Realm toyota-corp created")
 else:
-    print("[--] Realm toyota-corp ya existe")
+    print("[--] Realm toyota-corp already exists")
 
-# ── 2. Usuario john.doe en toyota-corp ───────────────────────────────────────
+# ── 2. User john.doe in toyota-corp ──────────────────────────────────────────
 users, _ = api("GET", "/admin/realms/toyota-corp/users?username=john.doe&exact=true", token=token)
 if not users:
     _, s = api("POST", "/admin/realms/toyota-corp/users", body={
@@ -68,17 +68,17 @@ if not users:
         "enabled": True,
         "emailVerified": True,
     }, token=token)
-    print(f"[{s}] Usuario john.doe creado en toyota-corp")
+    print(f"[{s}] User john.doe created in toyota-corp")
 
     users, _ = api("GET", "/admin/realms/toyota-corp/users?username=john.doe&exact=true", token=token)
     uid = users[0]["id"]
     _, s = api("PUT", f"/admin/realms/toyota-corp/users/{uid}/reset-password",
                body={"type": "password", "value": "toyota123", "temporary": False}, token=token)
-    print(f"[{s}] Password toyota123 asignado a john.doe")
+    print(f"[{s}] Password toyota123 assigned to john.doe")
 else:
-    print("[--] Usuario john.doe ya existe en toyota-corp")
+    print("[--] User john.doe already exists in toyota-corp")
 
-# ── 3. Cliente altana-broker en toyota-corp ───────────────────────────────────
+# ── 3. Client altana-broker in toyota-corp ────────────────────────────────────
 clients, _ = api("GET", "/admin/realms/toyota-corp/clients?clientId=altana-broker", token=token)
 if not clients:
     _, s = api("POST", "/admin/realms/toyota-corp/clients", body={
@@ -89,16 +89,16 @@ if not clients:
         "directAccessGrantsEnabled": False,
         "redirectUris": [f"{KC}/realms/altana-dev/broker/toyota-corp/endpoint"]
     }, token=token)
-    print(f"[{s}] Cliente altana-broker creado en toyota-corp")
+    print(f"[{s}] Client altana-broker created in toyota-corp")
 else:
-    print("[--] Cliente altana-broker ya existe en toyota-corp")
+    print("[--] Client altana-broker already exists in toyota-corp")
 
-# ── 4. IDP toyota-corp en altana-dev ─────────────────────────────────────────
+# ── 4. IDP toyota-corp in altana-dev ─────────────────────────────────────────
 _, status = api("GET", "/admin/realms/altana-dev/identity-provider/instances/toyota-corp", token=token)
 if status == 404:
     _, s = api("POST", "/admin/realms/altana-dev/identity-provider/instances", body={
         "alias": "toyota-corp",
-        "displayName": "Login con Toyota",
+        "displayName": "Login with Toyota",
         "providerId": "oidc",
         "enabled": True,
         "trustEmail": True,
@@ -115,11 +115,11 @@ if status == 404:
             "syncMode": "IMPORT",
         }
     }, token=token)
-    print(f"[{s}] IDP toyota-corp registrado en altana-dev")
+    print(f"[{s}] IDP toyota-corp registered in altana-dev")
 else:
-    print("[--] IDP toyota-corp ya existe en altana-dev")
+    print("[--] IDP toyota-corp already exists in altana-dev")
 
-# ── 5. Verificar mapper types disponibles ─────────────────────────────────────
+# ── 5. Verify available mapper types ──────────────────────────────────────────
 mapper_types, _ = api(
     "GET",
     "/admin/realms/altana-dev/identity-provider/instances/toyota-corp/mapper-types",
@@ -145,23 +145,23 @@ if "oidc-user-attribute-idp-mapper" not in existing_types:
                    "identityProviderAlias": "toyota-corp",
                    "config": {"syncMode": "INHERIT", "claim": "email", "user.attribute": "email"}
                }, token=token)
-    print(f"[{s}] Email mapper creado")
+    print(f"[{s}] Email mapper created")
 else:
-    print("[--] Email mapper ya existe")
+    print("[--] Email mapper already exists")
 
-# Role mapper — usar oidc-hardcoded-role-idp-mapper (nombre correcto en KC 26)
+# Role mapper — use oidc-hardcoded-role-idp-mapper (correct name in KC 26)
 HARDCODED_ROLE_MAPPER = "oidc-hardcoded-role-idp-mapper"
 if HARDCODED_ROLE_MAPPER not in available_ids:
-    print(f"[WARN] {HARDCODED_ROLE_MAPPER} no disponible en esta versión de Keycloak")
-    print(f"       Disponibles: {available_ids}")
+    print(f"[WARN] {HARDCODED_ROLE_MAPPER} not available in this Keycloak version")
+    print(f"       Available: {available_ids}")
 elif HARDCODED_ROLE_MAPPER not in existing_types:
-    # Borrar cualquier mapper de rol incorrecto primero
+    # Delete any incorrect role mapper first
     for m in (mappers or []):
         if "role" in m["identityProviderMapper"].lower():
             api("DELETE",
                 f"/admin/realms/altana-dev/identity-provider/instances/toyota-corp/mappers/{m['id']}",
                 token=token)
-            print(f"[--] Mapper incorrecto borrado: {m['identityProviderMapper']}")
+            print(f"[--] Incorrect mapper deleted: {m['identityProviderMapper']}")
 
     _, s = api("POST",
                "/admin/realms/altana-dev/identity-provider/instances/toyota-corp/mappers",
@@ -171,12 +171,12 @@ elif HARDCODED_ROLE_MAPPER not in existing_types:
                    "identityProviderAlias": "toyota-corp",
                    "config": {
                        "syncMode": "IMPORT",
-                       "role": "ROLE_ANALYST"    # nombre, no UUID
+                       "role": "ROLE_ANALYST"    # name, not UUID
                    }
                }, token=token)
-    print(f"[{s}] Role mapper creado: {HARDCODED_ROLE_MAPPER} → ROLE_ANALYST")
+    print(f"[{s}] Role mapper created: {HARDCODED_ROLE_MAPPER} → ROLE_ANALYST")
 else:
-    print("[--] Role mapper ya existe")
+    print("[--] Role mapper already exists")
 
-print("\nSetup B2B completo.")
-print("Ejecuta: python scripts\\verify_b2b_setup.py para confirmar.")
+print("\nB2B setup complete.")
+print("Run: python scripts\\verify_b2b_setup.py to confirm.")

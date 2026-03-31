@@ -1,15 +1,15 @@
 """
-CONCEPTO: Resource Server
+CONCEPT: Resource Server
 
-Este router representa la API protegida de supply chain.
-No sabe nada de Keycloak ni de como se emitio el token.
-Solo recibe el usuario ya validado via dependency injection.
+This router represents the protected supply chain API.
+It knows nothing about Keycloak or how the token was issued.
+It only receives the already-validated user via dependency injection.
 
-Patrones demostrados:
-- Endpoint publico (sin auth)
-- Endpoint autenticado (cualquier usuario logueado)
-- Endpoint con rol especifico (RBAC)
-- Endpoint que usa datos del token (usuario actual)
+Patterns demonstrated:
+- Public endpoint (no auth)
+- Authenticated endpoint (any logged-in user)
+- Role-specific endpoint (RBAC)
+- Endpoint that uses token data (current user)
 """
 
 from fastapi import APIRouter, Depends
@@ -18,24 +18,24 @@ from altana.auth.dependencies import TokenData, get_current_user, require_role
 router = APIRouter(prefix="/supply-chain", tags=["Supply Chain"])
 
 
-# ─── ENDPOINT PUBLICO ────────────────────────────────────────────────────────
+# ─── PUBLIC ENDPOINT ──────────────────────────────────────────────────────────
 
 @router.get("/health")
 async def health():
-    """Sin autenticacion — para load balancers y health checks."""
+    """No authentication — for load balancers and health checks."""
     return {"status": "ok", "service": "supply-chain-api"}
 
 
-# ─── ENDPOINT AUTENTICADO (cualquier usuario) ────────────────────────────────
+# ─── AUTHENTICATED ENDPOINT (any user) ───────────────────────────────────────
 
 @router.get("/suppliers")
 async def list_suppliers(user: TokenData = Depends(get_current_user)):
     """
-    Requiere token valido. Cualquier usuario autenticado puede ver proveedores.
+    Requires a valid token. Any authenticated user can list suppliers.
 
-    CONCEPTO: el token llega en el header:
+    CONCEPT: the token arrives in the header:
       Authorization: Bearer eyJhbGci...
-    FastAPI lo extrae, get_current_user lo valida y lo deserializa.
+    FastAPI extracts it, get_current_user validates and deserializes it.
     """
     return {
         "requested_by": user.username,
@@ -48,7 +48,7 @@ async def list_suppliers(user: TokenData = Depends(get_current_user)):
 
 @router.get("/me")
 async def my_profile(user: TokenData = Depends(get_current_user)):
-    """Devuelve los datos del usuario actual extraidos del JWT."""
+    """Returns the current user's data extracted from the JWT."""
     return {
         "sub":       user.sub,
         "username":  user.username,
@@ -59,7 +59,7 @@ async def my_profile(user: TokenData = Depends(get_current_user)):
     }
 
 
-# ─── ENDPOINTS CON RBAC ──────────────────────────────────────────────────────
+# ─── RBAC ENDPOINTS ───────────────────────────────────────────────────────────
 
 @router.get(
     "/shipments",
@@ -67,11 +67,11 @@ async def my_profile(user: TokenData = Depends(get_current_user)):
 )
 async def list_shipments(user: TokenData = Depends(get_current_user)):
     """
-    Solo ROLE_ANALYST o ROLE_ADMIN.
+    ROLE_ANALYST or ROLE_ADMIN only.
 
-    CONCEPTO: dos formas de usar require_role:
-    1. En 'dependencies=[]' — solo verifica, no inyecta el user
-    2. Como parametro — verifica Y da acceso al user en el handler
+    CONCEPT: two ways to use require_role:
+    1. In 'dependencies=[]' — only verifies, does not inject the user
+    2. As a parameter — verifies AND gives access to the user in the handler
     """
     return {
         "requested_by": user.username,
@@ -87,11 +87,11 @@ async def list_shipments(user: TokenData = Depends(get_current_user)):
     dependencies=[Depends(require_role("ROLE_ADMIN"))]
 )
 async def delete_supplier(supplier_id: int, user: TokenData = Depends(get_current_user)):
-    """Solo ROLE_ADMIN puede eliminar proveedores."""
+    """Only ROLE_ADMIN can delete suppliers."""
     return {
         "deleted_by": user.username,
         "supplier_id": supplier_id,
-        "message": f"Proveedor {supplier_id} eliminado"
+        "message": f"Supplier {supplier_id} deleted"
     }
 
 
@@ -102,8 +102,8 @@ async def flag_compliance(
     user: TokenData = Depends(require_role("ROLE_ANALYST", "ROLE_ADMIN")),
 ):
     """
-    Forma alternativa: require_role como dependency directa en el parametro.
-    El user aqui ya fue validado con el rol correcto.
+    Alternative form: require_role as a direct dependency on the parameter.
+    The user here has already been validated with the correct role.
     """
     return {
         "flagged_by": user.username,
@@ -113,21 +113,21 @@ async def flag_compliance(
     }
 
 
-# ─── ENDPOINTS B2B2C ─────────────────────────────────────────────────────────
+# ─── B2B2C ENDPOINTS ──────────────────────────────────────────────────────────
 
 @router.get("/my-shipments")
 async def my_shipments(user: TokenData = Depends(require_role("ROLE_VIEWER", "ROLE_ANALYST", "ROLE_ADMIN"))):
     """
-    B2B2C: endpoint para consumidores finales (ROLE_VIEWER) y empleados.
+    B2B2C: endpoint for end consumers (ROLE_VIEWER) and employees.
 
-    CONCEPTO: filtrado por tenant_id
-    - ROLE_VIEWER (consumidor): ve solo los envios de su empresa (tenant_id)
-    - ROLE_ANALYST/ADMIN: ve todos los envios
+    CONCEPT: filtering by tenant_id
+    - ROLE_VIEWER (consumer): sees only shipments for their company (tenant_id)
+    - ROLE_ANALYST/ADMIN: sees all shipments
 
-    En produccion: tenant_id se usa para filtrar en base de datos.
-    Aqui simulamos el filtrado con datos en memoria.
+    In production: tenant_id is used to filter in the database.
+    Here we simulate the filtering with in-memory data.
     """
-    # Dataset simulado con tenant_id
+    # Simulated dataset with tenant_id
     all_shipments = [
         {"id": "SH-001", "origin": "Shanghai",  "destination": "LA", "status": "in_transit", "tenant_id": "toyota"},
         {"id": "SH-002", "origin": "Hamburg",   "destination": "NY", "status": "delivered",  "tenant_id": "toyota"},
@@ -135,7 +135,7 @@ async def my_shipments(user: TokenData = Depends(require_role("ROLE_VIEWER", "RO
         {"id": "SH-004", "origin": "Osaka",     "destination": "NY", "status": "in_transit", "tenant_id": "toyota"},
     ]
 
-    # ROLE_VIEWER: solo ve su tenant
+    # ROLE_VIEWER: sees only their tenant
     if "ROLE_VIEWER" in user.roles and "ROLE_ANALYST" not in user.roles and "ROLE_ADMIN" not in user.roles:
         tenant = user.tenant_id or ""
         shipments = [s for s in all_shipments if s["tenant_id"] == tenant]
@@ -146,7 +146,7 @@ async def my_shipments(user: TokenData = Depends(require_role("ROLE_VIEWER", "RO
             "shipments":    shipments,
         }
 
-    # ROLE_ANALYST / ROLE_ADMIN: ve todo
+    # ROLE_ANALYST / ROLE_ADMIN: sees everything
     return {
         "requested_by": user.username,
         "filter":       "none (full access)",

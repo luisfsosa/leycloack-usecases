@@ -1,8 +1,8 @@
 /**
- * Configuración central de URLs.
- * Cambiar aquí para mover todo el proyecto a otro host/puerto.
+ * Central URL configuration.
+ * Change here to move the entire project to a different host/port.
  *
- * En producción: reemplazar con variables de entorno de Vite:
+ * In production: replace with Vite environment variables:
  *   VITE_API_URL=https://api.altana.com
  *   VITE_KEYCLOAK_URL=https://auth.altana.com
  */

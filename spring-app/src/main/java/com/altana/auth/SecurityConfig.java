@@ -1,15 +1,15 @@
 package com.altana.auth;
 
 /*
- * CONCEPTO: Spring Security 6+ — SecurityFilterChain
+ * CONCEPT: Spring Security 6+ — SecurityFilterChain
  *
- * No más WebSecurityConfigurerAdapter (eliminado en Spring Security 6).
- * La configuración se hace con un @Bean SecurityFilterChain.
+ * No more WebSecurityConfigurerAdapter (removed in Spring Security 6).
+ * Configuration is done with a @Bean SecurityFilterChain.
  *
- * ENTREVISTA: ¿Diferencia entre hasRole() y hasAuthority()?
- *   hasRole("ANALYST")           → busca "ROLE_ANALYST" (añade prefijo)
- *   hasAuthority("ROLE_ANALYST") → busca "ROLE_ANALYST" literalmente
- *   Como nuestros roles ya tienen "ROLE_", usamos hasAuthority().
+ * INTERVIEW: Difference between hasRole() and hasAuthority()?
+ *   hasRole("ANALYST")           → looks for "ROLE_ANALYST" (adds prefix)
+ *   hasAuthority("ROLE_ANALYST") → looks for "ROLE_ANALYST" literally
+ *   Since our roles already have "ROLE_", we use hasAuthority().
  */
 
 import org.springframework.context.annotation.Bean;
@@ -58,21 +58,21 @@ public class SecurityConfig {
     }
 
     /*
-     * CONCEPTO: CORS (Cross-Origin Resource Sharing)
-     * El browser bloquea requests de origen distinto (localhost:5173 → localhost:8081)
-     * a menos que el servidor incluya los headers CORS correctos.
+     * CONCEPT: CORS (Cross-Origin Resource Sharing)
+     * The browser blocks cross-origin requests (localhost:5173 → localhost:8081)
+     * unless the server includes the correct CORS headers.
      *
-     * ENTREVISTA: ¿Por qué configuras CORS en Spring y no en el proxy?
-     * → En producción se configura en el API Gateway/proxy (nginx, Kong).
-     *   En desarrollo local cada servicio lo maneja para simplicidad.
-     *   NUNCA usar allowedOrigins("*") en producción con allowCredentials(true).
+     * INTERVIEW: Why configure CORS in Spring and not in the proxy?
+     * → In production it is configured in the API Gateway/proxy (nginx, Kong).
+     *   In local development each service handles it for simplicity.
+     *   NEVER use allowedOrigins("*") in production with allowCredentials(true).
      */
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of(
             "http://localhost:5173",  // Vite dev server
-            "http://localhost:3000"   // alternativa
+            "http://localhost:3000"   // alternative
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type"));

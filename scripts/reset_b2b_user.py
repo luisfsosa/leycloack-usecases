@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Borra john.doe de altana-dev para forzar re-import limpio.
+Deletes john.doe from altana-dev to force a clean re-import.
 
-Usar cuando: el token no trae ROLE_ANALYST porque el usuario ya existía
-y el mapper IMPORT no volvió a ejecutar.
+Use when: the token does not include ROLE_ANALYST because the user already
+existed and the IMPORT mapper did not run again.
 
-Después de ejecutar este script: hacer login B2B de nuevo con generate_b2b_url.py
+After running this script: log in via B2B again with generate_b2b_url.py
 """
 import urllib.request, urllib.parse, json
 
@@ -30,12 +30,12 @@ with urllib.request.urlopen(urllib.request.Request(
     users = json.loads(r.read())
 
 if not users:
-    print("john.doe no existe en altana-dev — nada que hacer")
+    print("john.doe does not exist in altana-dev — nothing to do")
 else:
     uid = users[0]["id"]
     urllib.request.urlopen(urllib.request.Request(
         f"{KC}/admin/realms/altana-dev/users/{uid}",
         headers=auth, method="DELETE"
     ))
-    print(f"john.doe borrado de altana-dev (id: {uid})")
-    print("Ahora haz login B2B de nuevo — el mapper asignará ROLE_ANALYST al crear el usuario.")
+    print(f"john.doe deleted from altana-dev (id: {uid})")
+    print("Now log in via B2B again — the mapper will assign ROLE_ANALYST when the user is created.")

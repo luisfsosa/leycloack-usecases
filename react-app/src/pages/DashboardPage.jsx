@@ -1,6 +1,6 @@
 /**
- * Dashboard protegido — solo usuarios autenticados.
- * Muestra datos del JWT y llama a la FastAPI.
+ * Protected dashboard — authenticated users only.
+ * Displays JWT claims and calls the FastAPI.
  */
 
 import { useState } from 'react';
@@ -13,7 +13,7 @@ export default function DashboardPage() {
   const [apiError, setApiError]          = useState(null);
   const [loading, setLoading]            = useState(false);
 
-  /** Llama a la FastAPI con el access token en el header */
+  /** Calls the FastAPI with the access token in the Authorization header */
   async function callApi(endpoint) {
     setLoading(true);
     setApiError(null);
@@ -74,9 +74,9 @@ export default function DashboardPage() {
         <button onClick={logout} style={{ padding: '8px 16px' }}>Logout</button>
       </div>
 
-      {/* Datos del token */}
+      {/* Token data */}
       <section style={{ background: '#f0f0f0', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>
-        <h2>Token Claims (del JWT en memoria)</h2>
+        <h2>Token Claims (from in-memory JWT)</h2>
         <table>
           <tbody>
             <tr><td><b>username</b></td><td>{user?.username}</td></tr>
@@ -87,29 +87,29 @@ export default function DashboardPage() {
           </tbody>
         </table>
         <p style={{ fontSize: '0.8em', color: '#666' }}>
-          El access token vive solo en memoria JS (useRef). No está en localStorage ni en DevTools → Storage.
+          The access token lives only in JS memory (useRef). It is not in localStorage or DevTools → Storage.
         </p>
       </section>
 
-      {/* Llamadas a la API */}
+      {/* API calls */}
       <section>
-        <h2>Llamadas a FastAPI (puerto 8002)</h2>
+        <h2>FastAPI calls (port 8002)</h2>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '1rem' }}>
           <button onClick={() => callApi('/supply-chain/me')}>
             GET /me
           </button>
           <button onClick={() => callApi('/supply-chain/suppliers')}>
-            GET /suppliers (cualquier user)
+            GET /suppliers (any user)
           </button>
           <button onClick={() => callApi('/supply-chain/shipments')}>
             GET /shipments (ANALYST/ADMIN)
           </button>
           <button onClick={callDelete} style={{ background: '#ffcccc' }}>
-            DELETE /suppliers/1 (solo ADMIN)
+            DELETE /suppliers/1 (ADMIN only)
           </button>
         </div>
 
-        {loading && <p>Llamando a la API...</p>}
+        {loading && <p>Calling the API...</p>}
 
         {apiError && (
           <div style={{ background: '#ffeeee', padding: '1rem', borderRadius: '4px', color: 'red' }}>

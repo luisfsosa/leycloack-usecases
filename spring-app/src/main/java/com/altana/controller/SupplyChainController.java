@@ -1,21 +1,21 @@
 package com.altana.controller;
 
 /*
- * CONCEPTO: Resource Server Controller
+ * CONCEPT: Resource Server Controller
  *
- * Este controller NO sabe nada de Keycloak.
- * Recibe el Jwt ya validado via @AuthenticationPrincipal.
+ * This controller knows nothing about Keycloak.
+ * It receives the already-validated Jwt via @AuthenticationPrincipal.
  *
- * Spring Security garantiza que si el request llega aquí:
- *   1. Firma RS256 válida (verificada con public key de Keycloak)
- *   2. Token no expirado
+ * Spring Security guarantees that if a request reaches here:
+ *   1. Valid RS256 signature (verified with Keycloak's public key)
+ *   2. Token not expired
  *   3. Issuer = altana-dev
- *   4. Rol requerido presente (para endpoints RBAC)
+ *   4. Required role present (for RBAC endpoints)
  *
- * Comparación con FastAPI:
+ * Comparison with FastAPI:
  *   FastAPI: user: TokenData = Depends(get_current_user)
  *   Spring:  @AuthenticationPrincipal Jwt jwt
- *   → Mismo concepto: el framework inyecta el usuario autenticado.
+ *   → Same concept: the framework injects the authenticated user.
  */
 
 import com.altana.auth.TokenData;
@@ -30,14 +30,14 @@ import java.util.Map;
 @RequestMapping("/supply-chain")
 public class SupplyChainController {
 
-    // ─── PÚBLICO ─────────────────────────────────────────────────────────────
+    // ─── PUBLIC ──────────────────────────────────────────────────────────────
 
     @GetMapping("/health")
     public Map<String, String> health() {
         return Map.of("status", "ok", "service", "supply-chain-api-java");
     }
 
-    // ─── AUTENTICADO (cualquier usuario) ─────────────────────────────────────
+    // ─── AUTHENTICATED (any user) ─────────────────────────────────────────
 
     @GetMapping("/suppliers")
     public Map<String, Object> listSuppliers(@AuthenticationPrincipal Jwt jwt) {
@@ -58,11 +58,11 @@ public class SupplyChainController {
         return extractTokenData(jwt);
     }
 
-    // ─── RBAC ─────────────────────────────────────────────────────────────────
+    // ─── RBAC ─────────────────────────────────────────────────────────────
 
     @GetMapping("/shipments")
     public Map<String, Object> listShipments(@AuthenticationPrincipal Jwt jwt) {
-        // SecurityConfig ya verificó ROLE_ANALYST o ROLE_ADMIN
+        // SecurityConfig already verified ROLE_ANALYST or ROLE_ADMIN
         return Map.of(
             "requested_by", jwt.getClaimAsString("preferred_username"),
             "shipments", List.of(
@@ -76,15 +76,15 @@ public class SupplyChainController {
     public Map<String, Object> deleteSupplier(
             @PathVariable int supplierId,
             @AuthenticationPrincipal Jwt jwt) {
-        // SecurityConfig ya verificó ROLE_ADMIN
+        // SecurityConfig already verified ROLE_ADMIN
         return Map.of(
             "deleted_by",  jwt.getClaimAsString("preferred_username"),
             "supplier_id", supplierId,
-            "message",     "Proveedor " + supplierId + " eliminado"
+            "message",     "Supplier " + supplierId + " deleted"
         );
     }
 
-    // ─── B2B2C — filtrado por tenant ──────────────────────────────────────────
+    // ─── B2B2C — tenant-scoped data ───────────────────────────────────────
 
     @GetMapping("/my-shipments")
     public Map<String, Object> myShipments(@AuthenticationPrincipal Jwt jwt) {
@@ -122,7 +122,7 @@ public class SupplyChainController {
         );
     }
 
-    // ─── HELPER ───────────────────────────────────────────────────────────────
+    // ─── HELPER ───────────────────────────────────────────────────────────
 
     @SuppressWarnings("unchecked")
     private TokenData extractTokenData(Jwt jwt) {

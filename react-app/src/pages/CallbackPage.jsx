@@ -1,19 +1,19 @@
 /**
- * Callback page — procesa el redirect de Keycloak.
+ * Callback page — processes the redirect from Keycloak.
  *
- * PROBLEMA DE STRICTMODE:
- * React 18 StrictMode monta → desmonta → monta el componente en desarrollo.
- * Los useRef se recrean en cada mount. Por eso usamos una variable de módulo
- * (fuera del componente) para garantizar que el exchange se hace una sola vez.
+ * STRICT MODE ISSUE:
+ * React 18 StrictMode mounts → unmounts → mounts the component in development.
+ * useRefs are recreated on each mount. That is why we use a module-level variable
+ * (outside the component) to guarantee the exchange happens only once.
  *
- * En producción (sin StrictMode) esto no es necesario, pero es buena práctica.
+ * In production (without StrictMode) this is not needed, but it is good practice.
  */
 
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 
-// Variable de módulo — persiste entre remounts de StrictMode
+// Module-level variable — persists across StrictMode remounts
 let callbackProcessed = false;
 
 export default function CallbackPage() {
@@ -21,7 +21,7 @@ export default function CallbackPage() {
   const navigate           = useNavigate();
 
   useEffect(() => {
-    // Resetear al desmontar (permite re-uso si el usuario vuelve a esta ruta)
+    // Reset on unmount (allows reuse if the user navigates back to this route)
     return () => { callbackProcessed = false; };
   }, []);
 
@@ -34,7 +34,7 @@ export default function CallbackPage() {
     const state  = params.get('state');
     const error  = params.get('error');
 
-    // Debug en desarrollo
+    // Debug in development
     if (import.meta.env.DEV) {
       console.group('OAuth2 Callback Debug');
       console.log('code        :', code?.substring(0, 20) + '...');
@@ -64,7 +64,7 @@ export default function CallbackPage() {
 
   return (
     <div style={{ textAlign: 'center', marginTop: '20%', fontFamily: 'monospace' }}>
-      <p>Iniciando sesión...</p>
+      <p>Signing in...</p>
     </div>
   );
 }

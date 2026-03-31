@@ -3,17 +3,17 @@
 <@layout.registrationLayout displayMessage=true displayInfo=true; section>
 
     <#if section = "header">
-        Ingresa tu codigo
+        Enter your code
 
     <#elseif section = "info">
-        <#-- Mensaje debajo del título: donde se envió el código -->
+        <#-- Message below the title: where the code was sent -->
         <#if otp_method?? && otp_method == "email">
-            Enviamos un codigo de 6 digitos a
-            <strong>${destination!"tu email"}</strong>
+            We sent a 6-digit code to
+            <strong>${destination!"your email"}</strong>
         <#else>
-            Enviamos un codigo de 6 digitos al numero
-            <strong>${destination!"tu telefono"}</strong>
-            (SMS simulado — revisa los logs de Keycloak)
+            We sent a 6-digit code to
+            <strong>${destination!"your phone"}</strong>
+            (SMS simulated — check Keycloak logs)
         </#if>
 
     <#elseif section = "form">
@@ -25,7 +25,7 @@
 
             <div class="${properties.kcFormGroupClass!}">
                 <label for="otp_code" class="${properties.kcLabelClass!}">
-                    Codigo de verificacion
+                    Verification code
                 </label>
                 <input id="otp_code"
                        name="otp_code"
@@ -48,26 +48,26 @@
             <div class="${properties.kcFormGroupClass!}">
                 <input class="${properties.kcButtonClass!} ${properties.kcButtonPrimaryClass!} ${properties.kcButtonBlockClass!} ${properties.kcButtonLargeClass!}"
                        type="submit"
-                       value="Verificar" />
+                       value="Verify" />
             </div>
 
-            <#-- Opciones secundarias -->
+            <#-- Secondary options -->
             <div style="display:flex; justify-content:space-between; margin-top:12px; font-size:0.9em;">
 
-                <#-- Reenviar código -->
+                <#-- Resend code -->
                 <button type="submit"
                         name="form_action"
                         value="resend"
                         style="background:none; border:none; color:#1a73e8; cursor:pointer; padding:0; text-decoration:underline;">
-                    Reenviar codigo
+                    Resend code
                 </button>
 
-                <#-- Cambiar método -->
+                <#-- Change method -->
                 <button type="submit"
                         name="form_action"
                         value="change_method"
                         style="background:none; border:none; color:#666; cursor:pointer; padding:0; text-decoration:underline;">
-                    Usar otro metodo
+                    Use another method
                 </button>
 
             </div>

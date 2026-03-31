@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-UC6 — Test del flujo de invitación B2B Inverso
+UC6 — Test of the Reverse B2B invitation flow
 
-Uso:
+Usage:
     python scripts/test_uc6.py
     python scripts/test_uc6.py --user admin@altana.com --password admin
 
-Prereqs:
-    - Keycloak corriendo en localhost:8080
-    - FastAPI corriendo en localhost:8081
-    - Usuario con ROLE_ADMIN en realm altana-dev
+Prerequisites:
+    - Keycloak running on localhost:8080
+    - FastAPI running on localhost:8081
+    - User with ROLE_ADMIN in realm altana-dev
 """
 
 import argparse
@@ -68,11 +68,11 @@ def main():
 
     print("═" * 55)
     print("  UC6 — Supply Chain Partner Portal")
-    print("  Test: B2B Inverso — flujo de invitación")
+    print("  Test: Reverse B2B — invitation flow")
     print("═" * 55)
 
-    # ── Paso 1: Token del admin (altana-web — cliente público con DAG) ──
-    print(f"\n▶ Paso 1: Obtener token de admin ({args.user})...")
+    # ── Step 1: Admin token (altana-web — public client with DAG) ──
+    print(f"\n▶ Step 1: Get admin token ({args.user})...")
     resp = post(
         f"{KC_URL}/realms/{REALM}/protocol/openid-connect/token",
         data={
@@ -84,12 +84,12 @@ def main():
     )
     admin_token = resp.get("access_token", "")
     if not admin_token:
-        print("❌ No se obtuvo access_token. Verifica usuario y contraseña.")
+        print("❌ No access_token received. Check username and password.")
         sys.exit(1)
-    print(f"   ✓ Token obtenido ({len(admin_token)} chars)")
+    print(f"   ✓ Token obtained ({len(admin_token)} chars)")
 
-    # ── Paso 2: Crear invitación ──────────────────────────────
-    print("\n▶ Paso 2: Crear invitación para proveedor tier-2 de Toyota...")
+    # ── Step 2: Create invitation ──────────────────────────────────
+    print("\n▶ Step 2: Create invitation for Toyota tier-2 supplier...")
     invite = post(
         f"{API_URL}/invitations",
         json_body={
@@ -102,32 +102,32 @@ def main():
     )
     invite_token = invite["invitation_token"]
     invite_link  = invite["invite_link"]
-    print("   ✓ Invitación creada")
+    print("   ✓ Invitation created")
     print(f"   tenant_id:     {invite['tenant_id']}")
     print(f"   supplier_tier: {invite['supplier_tier']}")
     print(f"   invited_email: {invite['invited_email']}")
 
-    # ── Paso 3: Validar la invitación (endpoint público) ──────
-    print("\n▶ Paso 3: Validar la invitación (endpoint público)...")
+    # ── Step 3: Validate the invitation (public endpoint) ─────────
+    print("\n▶ Step 3: Validate invitation (public endpoint)...")
     details = get(f"{API_URL}/invitations/{invite_token}")
-    print("   Detalles:")
+    print("   Details:")
     print(json.dumps(details, indent=5, ensure_ascii=False))
 
-    # ── Resultado ─────────────────────────────────────────────
+    # ── Result ────────────────────────────────────────────────────
     print("\n" + "═" * 55)
-    print("  INVITE LINK (compartir con el proveedor):\n")
+    print("  INVITE LINK (share with the supplier):\n")
     print(f"  {invite_link}\n")
     print("═" * 55)
-    print("\nPróximos pasos (manual en browser):")
-    print("  1. Abrir el invite link en el browser")
-    print("  2. Click 'Crear cuenta' → Keycloak registration form")
-    print("  3. Completar registro con supplier@vn-parts.com")
+    print("\nNext steps (manual in browser):")
+    print("  1. Open the invite link in the browser")
+    print("  2. Click 'Create account' → Keycloak registration form")
+    print("  3. Complete registration with supplier@vn-parts.com")
     print("  4. Callback → onboarding → /supplier/dashboard")
 
-    # Guardar token para uso posterior
+    # Save token for later use
     token_file = Path(__file__).parent / "last_invite_token.txt"
     token_file.write_text(invite_token)
-    print(f"\n  ℹ Token guardado en {token_file}")
+    print(f"\n  ℹ Token saved to {token_file}")
 
 
 if __name__ == "__main__":

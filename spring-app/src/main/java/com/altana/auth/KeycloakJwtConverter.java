@@ -1,16 +1,16 @@
 package com.altana.auth;
 
 /*
- * CONCEPTO: Custom JWT Converter para Keycloak
+ * CONCEPT: Custom JWT Converter for Keycloak
  *
- * Problema: Spring Security lee roles del claim "scope".
- * Keycloak pone los roles en "realm_access.roles".
+ * Problem: Spring Security reads roles from the "scope" claim.
+ * Keycloak puts roles in "realm_access.roles".
  *
- * Sin este converter → Spring no ve ningún rol → todos los endpoints RBAC dan 403.
+ * Without this converter → Spring sees no roles → all RBAC endpoints return 403.
  *
- * ENTREVISTA: ¿Cómo integras los roles de Keycloak con Spring Security?
- * → Implementando Converter<Jwt, AbstractAuthenticationToken> que lee
- *   realm_access.roles y crea un GrantedAuthority por cada rol.
+ * INTERVIEW: How do you integrate Keycloak roles with Spring Security?
+ * → By implementing Converter<Jwt, AbstractAuthenticationToken> that reads
+ *   realm_access.roles and creates a GrantedAuthority for each role.
  */
 
 import org.springframework.core.convert.converter.Converter;
@@ -43,8 +43,8 @@ public class KeycloakJwtConverter implements Converter<Jwt, AbstractAuthenticati
 
         List<String> roles = (List<String>) realmAccess.getOrDefault("roles", List.of());
 
-        // Keycloak ya usa "ROLE_ANALYST", Spring Security lo mapea directo.
-        // hasRole("ANALYST") → busca "ROLE_ANALYST" ✓
+        // Keycloak already uses "ROLE_ANALYST", Spring Security maps it directly.
+        // hasRole("ANALYST") → looks for "ROLE_ANALYST" ✓
         return roles.stream()
                 .map(SimpleGrantedAuthority::new)
                 .collect(Collectors.toList());

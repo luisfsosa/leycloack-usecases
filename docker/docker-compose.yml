@@ -1,14 +1,14 @@
 # =============================================================================
-# CONCEPTO: Este docker-compose levanta el ambiente de desarrollo completo.
-# Keycloak SIEMPRE necesita una base de datos en producción (no usar H2 en prod).
-# PostgreSQL es la DB recomendada para Keycloak por performance y soporte.
+# CONCEPT: This docker-compose brings up the full development environment.
+# Keycloak ALWAYS needs a database in production (never use H2 in prod).
+# PostgreSQL is the recommended DB for Keycloak for performance and support.
 # =============================================================================
 
 services:
 
   # ---------------------------------------------------------------------------
-  # POSTGRESQL – Base de datos de Keycloak
-  # Keycloak almacena aquí: realms, clients, users, sessions, events
+  # POSTGRESQL – Keycloak database
+  # Keycloak stores here: realms, clients, users, sessions, events
   # ---------------------------------------------------------------------------
   postgres:
     image: postgres:16
@@ -16,7 +16,7 @@ services:
     environment:
       POSTGRES_DB: keycloak
       POSTGRES_USER: keycloak
-      POSTGRES_PASSWORD: keycloak_dev_pass   # SOLO desarrollo – usar secrets en prod
+      POSTGRES_PASSWORD: keycloak_dev_pass   # development only – use secrets in prod
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -32,7 +32,7 @@ services:
   # ---------------------------------------------------------------------------
   # KEYCLOAK 26.5.6 – Identity Provider
   #
-  # CONCEPTO: Keycloak expone varios endpoints importantes:
+  # CONCEPT: Keycloak exposes several important endpoints:
   #   - /realms/{realm}/.well-known/openid-configuration  → Discovery document
   #   - /realms/{realm}/protocol/openid-connect/auth      → Authorization endpoint
   #   - /realms/{realm}/protocol/openid-connect/token     → Token endpoint
@@ -40,42 +40,42 @@ services:
   #   - /realms/{realm}/protocol/openid-connect/userinfo  → UserInfo endpoint
   #   - /admin/realms                                      → Admin REST API
   #
-  # ENTREVISTA: ¿Qué es el Discovery Document?
-  #   → Endpoint estándar OIDC que describe todos los endpoints disponibles,
-  #     algoritmos soportados, scopes, etc. Los clientes lo usan para
-  #     auto-configurarse sin hardcodear URLs.
+  # INTERVIEW: What is the Discovery Document?
+  #   → A standard OIDC endpoint that describes all available endpoints,
+  #     supported algorithms, scopes, etc. Clients use it to auto-configure
+  #     themselves without hardcoding URLs.
   # ---------------------------------------------------------------------------
   keycloak:
     image: quay.io/keycloak/keycloak:26.5.6
     container_name: altana-keycloak
     command: start-dev --import-realm
     environment:
-      # Admin credentials – NUNCA usar estos en producción
+      # Admin credentials – NEVER use these in production
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
 
-      # Base de datos
+      # Database
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
       KC_DB_USERNAME: keycloak
       KC_DB_PASSWORD: keycloak_dev_pass
 
-      # Configuración general
+      # General configuration
       KC_HOSTNAME: localhost
       KC_HTTP_ENABLED: true
       KC_LOG_LEVEL: INFO
 
-      # Health checks habilitados
+      # Health checks enabled
       KC_HEALTH_ENABLED: true
       KC_METRICS_ENABLED: true
     volumes:
-      # Importar realm al iniciar (útil para dev reproducible)
+      # Import realm on startup (useful for reproducible dev environments)
       - ./keycloak/realms:/opt/keycloak/data/import
-      # Themes personalizados (para UC2)
+      # Custom themes (for UC2)
       - ./keycloak/themes:/opt/keycloak/themes
-      # SPI Extensions: JARs en esta carpeta son cargados automáticamente
-      # CONCEPTO: Keycloak usa java.util.ServiceLoader para descubrir providers
-      # en /opt/keycloak/providers/ al iniciar con start-dev.
+      # SPI Extensions: JARs in this folder are loaded automatically.
+      # CONCEPT: Keycloak uses java.util.ServiceLoader to discover providers
+      # in /opt/keycloak/providers/ when starting with start-dev.
       - ./keycloak/providers:/opt/keycloak/providers
     ports:
       - "8080:8080"
@@ -93,9 +93,9 @@ services:
       - altana-net
 
   # ---------------------------------------------------------------------------
-  # MAILHOG – Servidor de email fake para desarrollo
-  # Keycloak envía emails para: verificación, reset password, OTP
-  # CONCEPTO: En producción configurar SMTP real. MailHog captura emails localmente.
+  # MAILHOG – Fake email server for development
+  # Keycloak sends emails for: verification, password reset, OTP
+  # CONCEPT: In production, configure a real SMTP server. MailHog captures emails locally.
   # ---------------------------------------------------------------------------
   mailhog:
     image: mailhog/mailhog:latest

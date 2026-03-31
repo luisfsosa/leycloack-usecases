@@ -1,8 +1,8 @@
 /**
  * UC6 — SupplierDashboardPage
  *
- * Portal del proveedor: órdenes de compra + subida de documentos.
- * Requiere autenticación (protegido por ProtectedRoute en App.jsx).
+ * Supplier portal: purchase orders + document uploads.
+ * Requires authentication (protected by ProtectedRoute in App.jsx).
  */
 
 import { useEffect, useState } from 'react';
@@ -42,7 +42,7 @@ export default function SupplierDashboardPage() {
         body: JSON.stringify({
           document_type:   'certificate_of_origin',
           filename:        'cert-origin-2025.pdf',
-          content_preview: 'Certificado de origen — Piezas de freno lote 2025-Q2',
+          content_preview: 'Certificate of origin — Brake parts batch 2025-Q2',
         }),
       });
       const data = await res.json();
@@ -62,7 +62,7 @@ export default function SupplierDashboardPage() {
 
   if (!dashboard) return (
     <div style={styles.container}>
-      <p>Cargando portal...</p>
+      <p>Loading portal...</p>
     </div>
   );
 
@@ -71,19 +71,19 @@ export default function SupplierDashboardPage() {
       <div style={styles.header}>
         <div>
           <h1 style={styles.title}>{dashboard.welcome}</h1>
-          <p style={styles.subtitle}>Bienvenido, <strong>{dashboard.supplier}</strong></p>
+          <p style={styles.subtitle}>Welcome, <strong>{dashboard.supplier}</strong></p>
         </div>
-        <button style={styles.logoutBtn} onClick={logout}>Cerrar sesión</button>
+        <button style={styles.logoutBtn} onClick={logout}>Sign out</button>
       </div>
 
       <div style={styles.grid}>
-        {/* Órdenes de compra */}
+        {/* Purchase orders */}
         <div style={styles.card}>
-          <h2 style={styles.cardTitle}>Órdenes de compra</h2>
+          <h2 style={styles.cardTitle}>Purchase Orders</h2>
           <table style={styles.table}>
             <thead>
               <tr>
-                {['Número', 'Item', 'Cantidad', 'Estado'].map(h => (
+                {['Number', 'Item', 'Qty', 'Status'].map(h => (
                   <th key={h} style={styles.th}>{h}</th>
                 ))}
               </tr>
@@ -105,25 +105,25 @@ export default function SupplierDashboardPage() {
           </table>
         </div>
 
-        {/* Certificaciones */}
+        {/* Certifications */}
         <div style={styles.card}>
-          <h2 style={styles.cardTitle}>Certificaciones</h2>
+          <h2 style={styles.cardTitle}>Certifications</h2>
           {dashboard.certifications.map(c => (
             <div key={c.cert_id} style={styles.certRow}>
               <span style={{ fontWeight: 600 }}>{c.cert_id}</span>
-              <span style={{ color: '#666', fontSize: '13px' }}>Válido hasta {c.valid_until}</span>
+              <span style={{ color: '#666', fontSize: '13px' }}>Valid until {c.valid_until}</span>
               <span style={{ ...styles.statusBadge, ...statusColor(c.status) }}>{c.status}</span>
             </div>
           ))}
 
           <div style={{ marginTop: '20px' }}>
-            <h3 style={{ fontSize: '15px', marginBottom: '10px' }}>Subir documento</h3>
+            <h3 style={{ fontSize: '15px', marginBottom: '10px' }}>Upload document</h3>
             <button
               style={styles.uploadBtn}
               onClick={handleUpload}
               disabled={uploading}
             >
-              {uploading ? 'Subiendo...' : 'Subir certificado de origen'}
+              {uploading ? 'Uploading...' : 'Upload certificate of origin'}
             </button>
             {uploadResult && (
               <p style={{ color: 'green', fontSize: '13px', marginTop: '8px' }}>

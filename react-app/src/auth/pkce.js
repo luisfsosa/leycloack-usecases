@@ -1,16 +1,16 @@
 /**
- * PKCE utilities — todo ocurre en el browser, sin librerías externas.
+ * PKCE utilities — everything runs in the browser, no external libraries.
  *
- * CONCEPTO: PKCE (Proof Key for Code Exchange)
- * El browser genera un par verifier/challenge ANTES de ir a Keycloak.
- * Keycloak guarda el challenge. Al intercambiar el code, el browser
- * envía el verifier. Keycloak verifica: SHA256(verifier) === challenge.
- * Si alguien interceptó el code, no tiene el verifier → no puede usarlo.
+ * CONCEPT: PKCE (Proof Key for Code Exchange)
+ * The browser generates a verifier/challenge pair BEFORE going to Keycloak.
+ * Keycloak stores the challenge. When exchanging the code, the browser
+ * sends the verifier. Keycloak verifies: SHA256(verifier) === challenge.
+ * If someone intercepted the code, they don't have the verifier → can't use it.
  *
- * Web Crypto API: nativa en todos los browsers modernos, no necesita librerías.
+ * Web Crypto API: native in all modern browsers, no libraries needed.
  */
 
-/** Convierte ArrayBuffer a string base64url (sin padding) */
+/** Converts an ArrayBuffer to a base64url string (no padding) */
 function base64urlEncode(buffer) {
   return btoa(String.fromCharCode(...new Uint8Array(buffer)))
     .replace(/\+/g, '-')
@@ -18,7 +18,7 @@ function base64urlEncode(buffer) {
     .replace(/=/g, '');
 }
 
-/** Genera un code_verifier aleatorio (43-128 chars, URL-safe) */
+/** Generates a random code_verifier (43-128 chars, URL-safe) */
 export function generateCodeVerifier() {
   const array = new Uint8Array(32); // 32 bytes → 43 chars base64url
   crypto.getRandomValues(array);
@@ -26,13 +26,13 @@ export function generateCodeVerifier() {
 }
 
 /**
- * Genera el code_challenge = BASE64URL(SHA256(verifier))
- * Web Crypto API es async → usa SubtleCrypto.digest()
+ * Generates the code_challenge = BASE64URL(SHA256(verifier))
+ * Web Crypto API is async → uses SubtleCrypto.digest()
  *
- * ENTREVISTA: "¿Por qué S256 y no plain?"
- * → plain envía el verifier en texto plano (inseguro). S256 envía el hash
- *   SHA256 del verifier. Incluso si el challenge es interceptado, no se
- *   puede derivar el verifier (SHA256 es one-way).
+ * INTERVIEW: "Why S256 and not plain?"
+ * → plain sends the verifier in plain text (insecure). S256 sends the
+ *   SHA256 hash of the verifier. Even if the challenge is intercepted,
+ *   the verifier cannot be derived (SHA256 is one-way).
  */
 export async function generateCodeChallenge(verifier) {
   const encoded = new TextEncoder().encode(verifier);
@@ -40,7 +40,7 @@ export async function generateCodeChallenge(verifier) {
   return base64urlEncode(digest);
 }
 
-/** Genera un state aleatorio para protección CSRF */
+/** Generates a random state value for CSRF protection */
 export function generateState() {
   const array = new Uint8Array(16);
   crypto.getRandomValues(array);

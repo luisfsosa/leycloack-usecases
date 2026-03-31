@@ -1,184 +1,184 @@
 # Altana – Keycloak Learning & Integration Project
 
-## Rol de Claude en este proyecto
-Actúas como **arquitecto experto + profesor** en Keycloak, IAM, OAuth2/OIDC y seguridad.
-- Explica los conceptos mientras escribes código
-- Indica qué aprende el usuario en cada paso
-- Señala preguntas de entrevista relacionadas con cada tema
-- El objetivo final: preparar al usuario para un rol de Keycloak + Python en empresa de supply-chain analytics
+## Claude's role in this project
+You act as **expert architect + teacher** in Keycloak, IAM, OAuth2/OIDC, and security.
+- Explain concepts while writing code
+- Point out what the user learns at each step
+- Highlight interview questions related to each topic
+- Ultimate goal: prepare the user for a Keycloak + Python role at a supply-chain analytics company
 
-## REGLA CRÍTICA — Nunca asumir, siempre verificar contra la versión en uso
+## CRITICAL RULE — Never assume, always verify against the version in use
 
-**Keycloak cambia APIs, nombres de providers y comportamientos entre versiones.**
-Antes de usar cualquier mapper type, endpoint, configuración o feature de Keycloak:
+**Keycloak changes APIs, provider names, and behaviors between versions.**
+Before using any mapper type, endpoint, configuration, or Keycloak feature:
 
-1. **Verificar los tipos disponibles via API** — no asumir que existen por documentación genérica:
+1. **Verify available types via the API** — do not assume they exist based on generic documentation:
    ```bash
-   # Mapper types disponibles para un IDP:
+   # Available mapper types for an IDP:
    GET /admin/realms/{realm}/identity-provider/instances/{alias}/mapper-types
 
-   # Authenticator providers disponibles:
+   # Available authenticator providers:
    GET /admin/realms/{realm}/authentication/authenticator-providers
 
    # Protocol mapper types:
    GET /admin/realms/{realm}/protocol-mappers/providers-per-protocol
    ```
 
-2. **Consultar la documentación de la versión exacta** — la versión en este proyecto es
-   **Keycloak 26.5.6**. Documentación:
-   - API REST: `https://www.keycloak.org/docs-api/26.5/rest-api/`
-   - Guía de administración: `https://www.keycloak.org/docs/26.5/server_admin/`
-   - Migration guide (cambios entre versiones): `https://www.keycloak.org/docs/26.5/upgrading/`
+2. **Consult the documentation for the exact version** — the version used in this project is
+   **Keycloak 26.5.6**. Documentation:
+   - REST API: `https://www.keycloak.org/docs-api/26.5/rest-api/`
+   - Administration guide: `https://www.keycloak.org/docs/26.5/server_admin/`
+   - Migration guide (changes between versions): `https://www.keycloak.org/docs/26.5/upgrading/`
 
-3. **Lección aprendida — caso real en este proyecto:**
-   - `hardcoded-role-idp-mapper` → NO existe en Keycloak 26
-   - `oidc-hardcoded-role-idp-mapper` → nombre correcto en Keycloak 26
-   - El config `role` acepta el **nombre** del rol, no el UUID
-   - Estos errores costaron múltiples intentos fallidos
-   - **Siempre consultar `mapper-types` antes de crear un mapper via API**
-
----
+3. **Lesson learned — real case in this project:**
+   - `hardcoded-role-idp-mapper` → does NOT exist in Keycloak 26
+   - `oidc-hardcoded-role-idp-mapper` → correct name in Keycloak 26
+   - The `role` config accepts the role **name**, not the UUID
+   - These errors cost multiple failed attempts
+   - **Always query `mapper-types` before creating a mapper via API**
 
 ---
 
-## Estructura del proyecto
+---
+
+## Project structure
 
 ```
 altana/
-├── spring-app/          # USE CASE 1: Spring Boot + Keycloak como IdP
+├── spring-app/          # USE CASE 1: Spring Boot + Keycloak as IdP
 ├── keycloak-extension/  # USE CASE 2: Keycloak SPI (custom authenticator, listener, mapper)
-├── python-app/          # USE CASE 3: Python/FastAPI + Keycloak (foco del rol)
+├── python-app/          # USE CASE 3: Python/FastAPI + Keycloak (main focus)
 ├── docker/              # Keycloak + PostgreSQL local dev
-└── docs/concepts/       # Explicaciones teóricas y cheat sheets
+└── docs/concepts/       # Theoretical explanations and cheat sheets
 ```
 
 ---
 
-## Casos de uso a construir (en orden)
+## Use cases to build (in order)
 
-### UC1 – Spring Boot como Resource Server
-- App Spring Boot protegida por Keycloak (OAuth2 Resource Server)
-- Valida JWT tokens emitidos por Keycloak
-- Demuestra: token validation, role-based access, scope handling
+### UC1 – Spring Boot as Resource Server
+- Spring Boot app protected by Keycloak (OAuth2 Resource Server)
+- Validates JWT tokens issued by Keycloak
+- Demonstrates: token validation, role-based access, scope handling
 
 ### UC2 – Keycloak SPI Extension
-- Custom Authenticator (flujo de login personalizado)
-- Event Listener (auditoría de eventos de login/logout)
-- Protocol Mapper (agregar claims custom al JWT)
-- Demuestra: extensibilidad de Keycloak a nivel SPI
+- Custom Authenticator (custom login flow)
+- Event Listener (audit of login/logout events)
+- Protocol Mapper (adding custom claims to the JWT)
+- Demonstrates: Keycloak extensibility at the SPI level
 
-### UC3 – Python/FastAPI + Keycloak (FOCO PRINCIPAL)
-- FastAPI con protección via Bearer token
-- PKCE flow para frontend/mobile
-- Client Credentials para service-to-service
-- B2B y B2B2C patterns
-- Demuestra: integración Python real como en el rol objetivo
+### UC3 – Python/FastAPI + Keycloak (MAIN FOCUS)
+- FastAPI protected via Bearer token
+- PKCE flow for frontend/mobile
+- Client Credentials for service-to-service
+- B2B and B2B2C patterns
+- Demonstrates: real Python integration as in the target role
 
 ---
 
-## Reglas de seguridad (NUNCA violar)
+## Security rules (NEVER violate)
 
-### Secrets y credenciales
-- NUNCA hardcodear client_secret en código o git
-- Usar variables de entorno: `KEYCLOAK_CLIENT_SECRET`, `KEYCLOAK_URL`
-- En producción: usar HashiCorp Vault o Azure KeyVault para secrets
-- El archivo `.env` NUNCA se commitea (ya está en .gitignore)
+### Secrets and credentials
+- NEVER hardcode client_secret in code or git
+- Use environment variables: `KEYCLOAK_CLIENT_SECRET`, `KEYCLOAK_URL`
+- In production: use HashiCorp Vault or Azure KeyVault for secrets
+- The `.env` file is NEVER committed (already in .gitignore)
 
-### Configuración de clientes Keycloak
-- Clientes públicos (frontend/mobile): SIEMPRE usar PKCE (`S256`)
-- Clientes confidenciales (backend): SIEMPRE usar client_secret + mTLS si es posible
-- NUNCA habilitar `Direct Access Grants` (Resource Owner Password) en producción
-- SIEMPRE configurar `Valid Redirect URIs` con URLs exactas (no wildcards en prod)
-- SIEMPRE configurar `Web Origins` para CORS
+### Keycloak client configuration
+- Public clients (frontend/mobile): ALWAYS use PKCE (`S256`)
+- Confidential clients (backend): ALWAYS use client_secret + mTLS if possible
+- NEVER enable `Direct Access Grants` (Resource Owner Password) in production
+- ALWAYS configure `Valid Redirect URIs` with exact URLs (no wildcards in prod)
+- ALWAYS configure `Web Origins` for CORS
 
-### Tokens JWT
-- Access token lifetime: máximo 5 minutos en producción
-- Refresh token lifetime: según el caso de uso (típico: 30 min a 8 horas)
-- NUNCA almacenar tokens en localStorage (usar httpOnly cookies)
-- SIEMPRE validar: signature, `exp`, `iss`, `aud`
-- El campo `exp` en JWT usa **UTC Unix timestamp** (no tiene timezone, es UTC)
+### JWT tokens
+- Access token lifetime: maximum 5 minutes in production
+- Refresh token lifetime: depends on use case (typical: 30 min to 8 hours)
+- NEVER store tokens in localStorage (use httpOnly cookies)
+- ALWAYS validate: signature, `exp`, `iss`, `aud`
+- The `exp` field in JWT uses **UTC Unix timestamp** (no timezone, it is UTC)
 
 ### SSL/TLS
-- NUNCA deshabilitar verificación SSL en producción
-- En desarrollo local: usar `verify=False` solo con flag explícito y comentario
-- En Keycloak: configurar HTTPS en el realm (no solo en el proxy)
+- NEVER disable SSL verification in production
+- In local development: use `verify=False` only with an explicit flag and comment
+- In Keycloak: configure HTTPS in the realm (not just in the proxy)
 
 ---
 
-## Convenciones de naming
+## Naming conventions
 
 ### Realms
-- Formato: `{cliente}-{ambiente}` → `altana-dev`, `altana-prod`
-- Un realm por cliente en B2B (aislamiento de tenants)
-- Realm `master` NUNCA para aplicaciones (solo admin)
+- Format: `{client}-{environment}` → `altana-dev`, `altana-prod`
+- One realm per client in B2B (tenant isolation)
+- `master` realm NEVER for applications (admin only)
 
 ### Clients
-- Backend services: `{servicio}-backend` → `supply-chain-backend`
+- Backend services: `{service}-backend` → `supply-chain-backend`
 - Frontend apps: `{app}-web` → `altana-web`
-- Service accounts: `{servicio}-sa` → `notification-sa`
+- Service accounts: `{service}-sa` → `notification-sa`
 - Mobile: `{app}-mobile` → `altana-mobile`
 
 ### Roles
-- Roles de realm (globales): `ROLE_ADMIN`, `ROLE_USER`
-- Roles de client (específicos): `supply-chain:read`, `supply-chain:write`
-- Grupos para asignación masiva, roles para permisos específicos
+- Realm roles (global): `ROLE_ADMIN`, `ROLE_USER`
+- Client roles (specific): `supply-chain:read`, `supply-chain:write`
+- Groups for bulk assignment, roles for specific permissions
 
 ---
 
-## Flujos OAuth2 – cuándo usar cada uno
+## OAuth2 flows – when to use each
 
-| Flujo | Cuándo usarlo | Ejemplo |
-|-------|---------------|---------|
-| **Authorization Code + PKCE** | Frontend, mobile, cualquier cliente público | React app, app móvil |
-| **Authorization Code** (confidential) | Web app con backend propio | Spring Boot MVC |
-| **Client Credentials** | Service-to-service, sin usuario | Microservicio A → B |
-| **Device Code** | Dispositivos sin browser | Smart TV, CLI tools |
-| **Refresh Token** | Renovar access token sin re-autenticar | Todos los flujos anteriores |
-| ~~Resource Owner Password~~ | **NUNCA en producción** | Solo testing interno |
+| Flow | When to use | Example |
+|------|-------------|---------|
+| **Authorization Code + PKCE** | Frontend, mobile, any public client | React app, mobile app |
+| **Authorization Code** (confidential) | Web app with its own backend | Spring Boot MVC |
+| **Client Credentials** | Service-to-service, no user | Microservice A → B |
+| **Device Code** | Devices without a browser | Smart TV, CLI tools |
+| **Refresh Token** | Renew access token without re-authenticating | All flows above |
+| ~~Resource Owner Password~~ | **NEVER in production** | Internal testing only |
 
 ---
 
-## Preguntas de entrevista frecuentes (practicar respuestas)
+## Common interview questions (practice answers)
 
-### Protocolos
-- ¿Cuál es la diferencia entre OAuth2 y OIDC?
-  → OAuth2 es autorización (qué puedes hacer), OIDC es autenticación (quién eres). OIDC agrega `id_token` (JWT) y el endpoint `/userinfo` sobre OAuth2.
-- ¿Cuándo usas SAML vs OIDC?
-  → SAML: enterprise legacy, SSO corporativo basado en XML. OIDC: moderno, JSON/JWT, mejor para APIs y móvil.
+### Protocols
+- What is the difference between OAuth2 and OIDC?
+  → OAuth2 is authorization (what you can do), OIDC is authentication (who you are). OIDC adds `id_token` (JWT) and the `/userinfo` endpoint on top of OAuth2.
+- When do you use SAML vs OIDC?
+  → SAML: enterprise legacy, XML-based corporate SSO. OIDC: modern, JSON/JWT, better for APIs and mobile.
 
 ### JWT
-- ¿Qué timezone usa el campo `exp` en un JWT?
-  → UTC Unix timestamp (segundos desde 1970-01-01 00:00:00 UTC). No tiene timezone.
-- ¿Cómo debuggeas un JWT?
-  → `jwt.io` o `python-jose`/`PyJWT` para decode. Verificar: firma, exp, iss, aud.
-- ¿Cómo troubleshooteas un JWT expirado en curl?
-  → Inspeccionar el 401, hacer `curl` al endpoint `/token` con refresh_token para renovar.
+- What timezone does the `exp` field in a JWT use?
+  → UTC Unix timestamp (seconds since 1970-01-01 00:00:00 UTC). It has no timezone.
+- How do you debug a JWT?
+  → `jwt.io` or `python-jose`/`PyJWT` for decode. Verify: signature, exp, iss, aud.
+- How do you troubleshoot an expired JWT in curl?
+  → Inspect the 401, then `curl` the `/token` endpoint with the refresh_token to renew.
 
 ### Keycloak
-- ¿Qué es un SPI en Keycloak?
-  → Service Provider Interface – mecanismo de extensión de Keycloak. Permite custom authenticators, event listeners, protocol mappers.
-- ¿Cómo configuras B2B en Keycloak?
-  → Identity Brokering: realm maestro federa realms de clientes externos vía OIDC/SAML. Cada cliente B2B tiene su propio realm o IDP.
+- What is an SPI in Keycloak?
+  → Service Provider Interface — Keycloak's extension mechanism. Allows custom authenticators, event listeners, protocol mappers.
+- How do you configure B2B in Keycloak?
+  → Identity Brokering: master realm federates external client realms via OIDC/SAML. Each B2B client has its own realm or IDP.
 
 ---
 
-## Comandos frecuentes de desarrollo
+## Common development commands
 
-### Docker – iniciar ambiente local
+### Docker – start local environment
 ```bash
 cd docker && docker compose up -d
 # Keycloak: http://localhost:8080 (admin/admin)
 # PostgreSQL: localhost:5432
 ```
 
-### Troubleshoot Authorization Code Flow con curl
+### Troubleshoot Authorization Code Flow with curl
 ```bash
-# Paso 1: obtener authorization code (abrir en browser)
+# Step 1: get authorization code (open in browser)
 # http://localhost:8080/realms/{realm}/protocol/openid-connect/auth?
 #   client_id=altana-web&response_type=code&scope=openid&
 #   redirect_uri=http://localhost:3000/callback&code_challenge=XXX&code_challenge_method=S256
 
-# Paso 2: intercambiar code por token
+# Step 2: exchange code for token
 curl -X POST http://localhost:8080/realms/{realm}/protocol/openid-connect/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=authorization_code" \
@@ -194,47 +194,47 @@ curl -X POST http://localhost:8080/realms/{realm}/protocol/openid-connect/token 
   -d "client_id=supply-chain-backend" \
   -d "client_secret=${KEYCLOAK_CLIENT_SECRET}"
 
-# Inspeccionar token (decode base64)
+# Inspect token (decode base64)
 echo "{JWT_PAYLOAD}" | base64 -d | python -m json.tool
 ```
 
-### Python – verificar token
+### Python – verify token
 ```python
-# Instalar: pip install python-jose[cryptography] httpx
+# Install: pip install python-jose[cryptography] httpx
 from jose import jwt
 import httpx
 
-# Obtener JWKS de Keycloak
+# Get JWKS from Keycloak
 KEYCLOAK_URL = "http://localhost:8080"
 REALM = "altana-dev"
 jwks = httpx.get(f"{KEYCLOAK_URL}/realms/{REALM}/protocol/openid-connect/certs").json()
 
-# Validar token
+# Validate token
 payload = jwt.decode(token, jwks, algorithms=["RS256"], audience="altana-web")
 ```
 
 ---
 
-## B2B y B2B2C patterns
+## B2B and B2B2C patterns
 
-### B2B (empresa-a-empresa)
-- Cada empresa cliente tiene su propio Identity Provider (Okta, Azure AD, etc.)
-- Keycloak actúa como **Identity Broker**: federa los IDPs externos
-- Configurar: `Identity Providers` → OIDC/SAML del cliente → mapear atributos a roles locales
-- SSL: siempre usar certificados válidos en el IDP externo
-- KeyVault: se puede integrar Azure KeyVault para gestionar certificados SAML/SSL vía scripts de admin
+### B2B (business-to-business)
+- Each enterprise client has its own Identity Provider (Okta, Azure AD, etc.)
+- Keycloak acts as an **Identity Broker**: federates external IDPs
+- Configure: `Identity Providers` → client's OIDC/SAML → map attributes to local roles
+- SSL: always use valid certificates on the external IDP
+- KeyVault: Azure KeyVault can be integrated to manage SAML/SSL certificates via admin scripts
 
-### B2B2C (empresa → empresa → consumidor final)
-- Capa 1: empresa cliente autentica con su IDP corporativo (B2B)
-- Capa 2: usuarios finales de la empresa cliente usan login de Keycloak
-- Implementar con: Organization feature (Keycloak 24+) o múltiples realms
-- Requiere: mapeo de roles entre capas, token enrichment via protocol mapper
+### B2B2C (business → business → end consumer)
+- Layer 1: enterprise client authenticates with its corporate IDP (B2B)
+- Layer 2: end users of the enterprise client use Keycloak login
+- Implement with: Organization feature (Keycloak 24+) or multiple realms
+- Requires: role mapping between layers, token enrichment via protocol mapper
 
 ---
 
-## Stack tecnológico del proyecto
+## Project technology stack
 
-| Módulo | Stack | Versión |
+| Module | Stack | Version |
 |--------|-------|---------|
 | Keycloak | Docker (quay.io/keycloak/keycloak) | 26.5.6 |
 | spring-app | Java 21, Spring Boot, Spring Security OAuth2 | Latest |
@@ -244,13 +244,13 @@ payload = jwt.decode(token, jwks, algorithms=["RS256"], audience="altana-web")
 
 ---
 
-## Orden de aprendizaje recomendado
+## Recommended learning order
 
-1. **Levantar Keycloak local** → entender la UI de admin, crear realm, client, user
-2. **Authorization Code Flow con curl** → entender el flujo completo a mano
-3. **UC3 Python/FastAPI** → proteger endpoints con JWT (foco del rol)
+1. **Start Keycloak locally** → understand the admin UI, create realm, client, user
+2. **Authorization Code Flow with curl** → understand the complete flow by hand
+3. **UC3 Python/FastAPI** → protect endpoints with JWT (main focus)
 4. **JWT deep dive** → decode, validation, claims, expiry
 5. **UC1 Spring Boot** → Resource Server, role-based access
-6. **B2B/B2B2C patterns** → Identity Brokering en Keycloak
-7. **UC2 SPI Extension** → custom authenticator y protocol mapper
-8. **SSL y producción** → HTTPS, certificates, KeyVault integration
+6. **B2B/B2B2C patterns** → Identity Brokering in Keycloak
+7. **UC2 SPI Extension** → custom authenticator and protocol mapper
+8. **SSL and production** → HTTPS, certificates, KeyVault integration

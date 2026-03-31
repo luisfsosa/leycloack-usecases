@@ -1,20 +1,20 @@
 /**
- * AuthContext — estado global de autenticación.
+ * AuthContext — global authentication state.
  *
- * CONCEPTO: dónde viven los tokens
- *   access_token  → useRef (memoria JS, no re-renderiza, no persiste)
- *   refresh_token → useRef (idem)
- *   id_token      → useRef (para logout)
- *   user          → useState (datos del usuario para mostrar en UI)
+ * CONCEPT: where tokens live
+ *   access_token  → useRef (JS memory, no re-render, not persisted)
+ *   refresh_token → useRef (same)
+ *   id_token      → useRef (for logout)
+ *   user          → useState (user data to display in the UI)
  *
- * ¿Por qué useRef y no useState para los tokens?
- * → useState guarda en el estado de React (visible en React DevTools).
- *   useRef guarda en un objeto mutable en memoria, menos exposición.
- *   Los tokens no necesitan causar re-renders — solo el objeto 'user' lo necesita.
+ * Why useRef and not useState for tokens?
+ * → useState stores in React state (visible in React DevTools).
+ *   useRef stores in a mutable object in memory, less exposure.
+ *   Tokens don't need to cause re-renders — only the 'user' object does.
  *
- * ENTREVISTA: "¿Dónde guardas el access token en una SPA?"
- * → En memoria (variable/ref de JS). Nunca en localStorage ni sessionStorage.
- *   Muere con el page refresh → se renueva con refresh_token automáticamente.
+ * INTERVIEW: "Where do you store the access token in a SPA?"
+ * → In memory (JS variable/ref). Never in localStorage or sessionStorage.
+ *   Dies on page refresh → renewed automatically with refresh_token.
  */
 
 import { createContext, useContext, useRef, useState, useEffect, useCallback } from 'react';
@@ -30,9 +30,9 @@ export function AuthProvider({ children }) {
   const refreshTimerRef = useRef(null);
 
   const [user, setUser]       = useState(null);   // { username, email, roles, sub }
-  const [loading, setLoading] = useState(true);   // true mientras verificamos sesión
+  const [loading, setLoading] = useState(true);   // true while verifying session
 
-  /** Guarda tokens en refs y extrae datos del usuario del JWT */
+  /** Stores tokens in refs and extracts user data from the JWT */
   const storeTokens = useCallback(({ access_token, refresh_token, id_token }) => {
     accessTokenRef.current  = access_token;
     refreshTokenRef.current = refresh_token;
@@ -48,17 +48,17 @@ export function AuthProvider({ children }) {
         exp:      payload.exp,
       });
 
-      // Programar auto-refresh 30 segundos antes de que expire
+      // Schedule auto-refresh 30 seconds before expiry
       scheduleRefresh(payload.exp);
     }
   }, []);
 
-  /** Auto-refresh: renueva el access token antes de que expire */
+  /** Auto-refresh: renews the access token before it expires */
   const scheduleRefresh = useCallback((exp) => {
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
 
     const now        = Math.floor(Date.now() / 1000);
-    const msToExpiry = (exp - now - 30) * 1000; // 30s de margen
+    const msToExpiry = (exp - now - 30) * 1000; // 30s margin
 
     if (msToExpiry <= 0) {
       doRefresh();
@@ -76,12 +76,12 @@ export function AuthProvider({ children }) {
       const tokens = await refreshAccessToken(rt);
       storeTokens(tokens);
     } catch {
-      // Refresh token expirado → logout
+      // Refresh token expired → logout
       clearAuth();
     }
   }, [storeTokens]);
 
-  /** Limpia todo el estado de auth */
+  /** Clears all auth state */
   const clearAuth = useCallback(() => {
     accessTokenRef.current  = null;
     refreshTokenRef.current = null;
@@ -110,9 +110,9 @@ export function AuthProvider({ children }) {
   }, []);
 
   /**
-   * UC6 — Inicia el flujo de REGISTRO en Keycloak.
-   * Igual que login pero redirige al formulario de registro.
-   * loginHint pre-rellena el email del proveedor invitado.
+   * UC6 — Starts the REGISTRATION flow in Keycloak.
+   * Same as login but redirects to the registration form.
+   * loginHint pre-fills the invited supplier's email.
    */
   const register = useCallback(async (loginHint = null) => {
     const verifier  = generateCodeVerifier();
@@ -126,28 +126,28 @@ export function AuthProvider({ children }) {
   }, []);
 
   /**
-   * Procesa el callback de Keycloak (/callback?code=XXX&state=YYY)
-   * Llamado desde el componente <CallbackPage>
+   * Processes the Keycloak callback (/callback?code=XXX&state=YYY)
+   * Called from the <CallbackPage> component
    */
   const handleCallback = useCallback(async (code, returnedState) => {
     const verifier      = sessionStorage.getItem('pkce_verifier');
     const expectedState = sessionStorage.getItem('pkce_state');
 
-    // Validar state anti-CSRF ANTES de limpiar
+    // Validate anti-CSRF state BEFORE clearing
     if (!expectedState || returnedState !== expectedState) {
       throw new Error(
-        `State mismatch — posible ataque CSRF.\n` +
+        `State mismatch — possible CSRF attack.\n` +
         `URL state: "${returnedState}"\n` +
         `Stored state: "${expectedState}"`
       );
     }
 
-    // Limpiar sessionStorage solo si el state es válido (one-time use)
+    // Clear sessionStorage only if state is valid (one-time use)
     sessionStorage.removeItem('pkce_verifier');
     sessionStorage.removeItem('pkce_state');
 
     if (!verifier) {
-      throw new Error('No se encontró el code verifier');
+      throw new Error('Code verifier not found');
     }
 
     const tokens = await exchangeCode(code, verifier);
@@ -155,18 +155,18 @@ export function AuthProvider({ children }) {
     return tokens;
   }, [storeTokens]);
 
-  /** Logout completo: limpia estado local + invalida sesión en Keycloak */
+  /** Full logout: clears local state + invalidates session in Keycloak */
   const logout = useCallback(() => {
     const idToken = idTokenRef.current;
     clearAuth();
     kcLogout(idToken);
   }, [clearAuth]);
 
-  /** Expone el access token para llamadas a APIs */
+  /** Exposes the access token for API calls */
   const getAccessToken = useCallback(() => accessTokenRef.current, []);
 
-  // Al montar: verificar si hay un page refresh y si el refresh token sigue vivo
-  // (En esta implementación simple no persistimos nada → siempre empieza sin sesión)
+  // On mount: check for page refresh and whether the refresh token is still alive
+  // (In this simple implementation nothing is persisted → always starts without a session)
   useEffect(() => {
     setLoading(false);
   }, []);
@@ -189,6 +189,6 @@ export function AuthProvider({ children }) {
 
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth debe usarse dentro de AuthProvider');
+  if (!ctx) throw new Error('useAuth must be used inside AuthProvider');
   return ctx;
 };

@@ -215,69 +215,69 @@ docker logs altana-keycloak 2>&1 | grep "altana-tenant-id-mapper"
 
 ## Configure in Keycloak Admin UI
 
-### Paso 1 — Declarar el atributo `tenant_id` en el User Profile Schema
+### Step 1 — Declare the `tenant_id` attribute in the User Profile Schema
 
-Keycloak 24+ requiere declarar atributos personalizados antes de poder asignarlos a usuarios.
-Sin este paso, `PUT /users/{id}` retorna 204 pero silenciosamente descarta el valor.
+Keycloak 24+ requires declaring custom attributes before they can be assigned to users.
+Without this step, `PUT /users/{id}` returns 204 but silently discards the value.
 
-1. **Realm Settings** → pestaña **User profile**
+1. **Realm Settings** → **User profile** tab
 2. Click **Create attribute**
-3. Completar:
+3. Fill in:
    - **Attribute name**: `tenant_id`
    - **Display name**: `Tenant ID`
    - **Enabled when**: Always
-4. En **Permissions**:
+4. Under **Permissions**:
    - **Who can view**: Admin, User
-   - **Who can edit**: Admin (solo el admin puede asignar el tenant)
+   - **Who can edit**: Admin (only the admin can assign the tenant)
 5. Click **Save**
 
-Repetir el mismo proceso para el atributo `user_type` (si también se mapea al JWT).
+Repeat the same process for the `user_type` attribute (if it is also mapped to the JWT).
 
 ---
 
-### Paso 2 — Asignar `tenant_id` a un usuario
+### Step 2 — Assign `tenant_id` to a user
 
-1. **Users** → buscar el usuario (ej. `analyst-user`)
-2. Pestaña **Attributes**
+1. **Users** → find the user (e.g. `analyst-user`)
+2. **Attributes** tab
 3. Click **Add attribute**
    - Key: `tenant_id` / Value: `toyota`
-4. Click **Add attribute** de nuevo
+4. Click **Add attribute** again
    - Key: `user_type` / Value: `employee`
 5. Click **Save**
 
 ---
 
-### Paso 3 — Agregar el mapper al cliente
+### Step 3 — Add the mapper to the client
 
-El mapper debe agregarse al cliente que emite los tokens que consumen `tenant_id`.
-Ejemplo con `altana-web` (el cliente de React):
+The mapper must be added to the client that issues the tokens consuming `tenant_id`.
+Example with `altana-web` (the React client):
 
-1. **Clients** → `altana-web` → pestaña **Client scopes**
-2. Click sobre `altana-web-dedicated` (el scope dedicado del cliente)
-3. Pestaña **Mappers** → **Add mapper** → **By configuration**
-4. Buscar y seleccionar **Altana Tenant ID Mapper**
-5. Configurar:
+1. **Clients** → `altana-web` → **Client scopes** tab
+2. Click on `altana-web-dedicated` (the dedicated scope of the client)
+3. **Mappers** tab → **Add mapper** → **By configuration**
+4. Find and select **Altana Tenant ID Mapper**
+5. Configure:
    - **Name**: `tenant_id mapper`
    - **Token Claim Name**: `tenant_id`
    - **Add to access token**: ON
    - **Add to ID token**: ON
-   - **Add to userinfo**: ON (opcional)
+   - **Add to userinfo**: ON (optional)
 6. Click **Save**
 
-Repetir si también necesitas el claim en `supply-chain-backend`.
+Repeat if you also need the claim in `supply-chain-backend`.
 
 ---
 
-### Paso 4 — Verificar que el JAR está cargado
+### Step 4 — Verify that the JAR is loaded
 
-Antes de buscar el mapper en la UI, confirmar que Keycloak lo detectó:
+Before searching for the mapper in the UI, confirm Keycloak detected it:
 
 ```bash
 docker logs altana-keycloak 2>&1 | grep -i "altana-tenant"
-# Esperado: KC-SERVICES0047: altana-tenant-id-mapper (com.altana.keycloak.mapper.TenantIdMapper) ...
+# Expected: KC-SERVICES0047: altana-tenant-id-mapper (com.altana.keycloak.mapper.TenantIdMapper) ...
 ```
 
-Si no aparece: verificar que el JAR está en `docker/keycloak/providers/` y recrear el contenedor.
+If it does not appear: verify that the JAR is in `docker/keycloak/providers/` and recreate the container.
 
 ---
 

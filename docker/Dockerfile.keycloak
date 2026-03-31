@@ -1,72 +1,72 @@
 # =============================================================================
-# CONCEPTO: Imagen Docker custom de Keycloak para Kubernetes
+# CONCEPT: Custom Keycloak Docker image for Kubernetes
 # =============================================================================
 #
-# En Kubernetes NO podemos usar volúmenes montados para las extensiones.
-# Las extensiones deben estar DENTRO de la imagen.
+# In Kubernetes we CANNOT use mounted volumes for extensions.
+# Extensions must be INSIDE the image.
 #
-# Por qué imagen custom y no init container:
-#   - Imagen custom: inmutable, versionada, rollback con kubectl rollout undo
-#   - Init container: más complejo, kc.sh build difícil de gestionar
+# Why a custom image instead of an init container:
+#   - Custom image: immutable, versioned, rollback with kubectl rollout undo
+#   - Init container: more complex, kc.sh build harder to manage
 #
-# Flujo CI/CD completo:
+# Full CI/CD flow:
 #   1. git push → GitHub Actions / Jenkins
 #   2. ./gradlew jar → altana-keycloak-extension-X.Y.Z.jar
 #   3. docker build -t registry/altana/keycloak:26.5.6-extX.Y.Z .
 #   4. docker push
 #   5. kubectl set image deployment/keycloak keycloak=registry/altana/keycloak:26.5.6-extX.Y.Z
-#      → Kubernetes hace rolling update sin downtime
+#      → Kubernetes performs a rolling update with no downtime
 #
-# ENTREVISTA: ¿Por qué corres kc.sh build en el Dockerfile?
-#   → Keycloak 26 usa Quarkus. kc.sh build pre-compila y optimiza Keycloak
-#     con todos los providers detectados. Sin este paso, Keycloak hace la
-#     optimización en el primer arranque (lento). Con este paso, el arranque
-#     es mucho más rápido en producción.
-#     En start-dev (desarrollo), kc.sh build no es necesario.
+# INTERVIEW: Why do you run kc.sh build in the Dockerfile?
+#   → Keycloak 26 uses Quarkus. kc.sh build pre-compiles and optimizes Keycloak
+#     with all detected providers. Without this step, Keycloak runs the
+#     optimization on first startup (slow). With this step, startup is
+#     much faster in production.
+#     In start-dev mode (development), kc.sh build is not needed.
 # =============================================================================
 
-# ─── Stage 1: Build de la extensión SPI ──────────────────────────────────────
+# ─── Stage 1: Build the SPI extension ────────────────────────────────────────
 #
-# Usamos eclipse-temurin:21-jdk (Keycloak 26 requiere Java 21+)
-# CONCEPTO: multi-stage build — el stage de build NO va a producción.
-# Solo el artefacto final (el JAR) pasa al stage siguiente.
-# Esto mantiene la imagen de producción pequeña y limpia.
+# Using eclipse-temurin:21-jdk (Keycloak 26 requires Java 21+)
+# CONCEPT: multi-stage build — the build stage does NOT go to production.
+# Only the final artifact (the JAR) is passed to the next stage.
+# This keeps the production image small and clean.
 
 FROM eclipse-temurin:21-jdk AS builder
 
 WORKDIR /build
 
-# Copiar primero solo los archivos de dependencias para aprovechar el cache de Docker.
-# Si no cambia build.gradle, Docker no re-descarga las dependencias.
+# Copy dependency files first to leverage Docker layer caching.
+# If build.gradle does not change, Docker skips re-downloading dependencies.
 COPY keycloak-extension/settings.gradle .
 COPY keycloak-extension/build.gradle .
 COPY keycloak-extension/gradle/ gradle/
 COPY keycloak-extension/gradlew .
 RUN chmod +x gradlew
 
-# Descargar dependencias (se cachea si build.gradle no cambia)
+# Download dependencies (cached if build.gradle does not change)
 RUN ./gradlew dependencies --no-daemon 2>/dev/null || true
 
-# Copiar el código fuente y compilar
+# Copy source code and compile
 COPY keycloak-extension/src/ src/
 RUN ./gradlew jar --no-daemon
 
 
-# ─── Stage 2: Imagen final de Keycloak ───────────────────────────────────────
+# ─── Stage 2: Final Keycloak image ───────────────────────────────────────────
 
 FROM quay.io/keycloak/keycloak:26.5.6
 
-# Copiar el JAR de la extensión desde el stage de build
+# Copy the extension JAR from the build stage
 COPY --from=builder /build/build/libs/altana-keycloak-extension-*.jar \
      /opt/keycloak/providers/
 
-# Copiar los temas custom (formularios de OTP)
+# Copy custom themes (OTP forms)
 COPY docker/keycloak/themes/ /opt/keycloak/themes/
 
-# Pre-compilar Keycloak con los providers incluidos.
-# IMPORTANTE: Esto hace que el arranque en Kubernetes sea rápido (~5s vs ~60s).
-# Las variables de entorno de producción (DB, hostname, etc.) se pasan
-# en el deployment.yaml, no aquí.
+# Pre-compile Keycloak with the included providers.
+# IMPORTANT: This makes startup in Kubernetes fast (~5s vs ~60s).
+# Production environment variables (DB, hostname, etc.) are passed
+# via deployment.yaml, not here.
 RUN /opt/keycloak/bin/kc.sh build
 
-# El CMD lo hereda de la imagen base (start o start-dev según el deployment)
+# CMD is inherited from the base image (start or start-dev depending on the deployment)

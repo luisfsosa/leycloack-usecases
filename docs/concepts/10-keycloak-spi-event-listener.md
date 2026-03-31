@@ -189,61 +189,61 @@ public void onEvent(AdminEvent adminEvent, boolean includeRepresentation) {
 
 ## Enabling the listener in Keycloak
 
-### Paso 1 — Verificar que el JAR está cargado
+### Step 1 — Verify that the JAR is loaded
 
 ```bash
 docker logs altana-keycloak 2>&1 | grep -i "altana-security"
-# Esperado: KC-SERVICES0047: altana-security-listener (com.altana.keycloak.listener.AltanaSecurityListenerFactory) ...
+# Expected: KC-SERVICES0047: altana-security-listener (com.altana.keycloak.listener.AltanaSecurityListenerFactory) ...
 ```
 
-Si no aparece: verificar que el JAR está en `docker/keycloak/providers/` y recrear el contenedor.
+If it does not appear: verify that the JAR is in `docker/keycloak/providers/` and recreate the container.
 
 ---
 
-### Paso 2 — Habilitar el listener en el realm (Admin UI)
+### Step 2 — Enable the listener in the realm (Admin UI)
 
-1. **Realm Settings** → pestaña **Events**
-2. En **Event listeners**: click en el campo y seleccionar `altana-security-listener`
-   - Mantener también `jboss-logging` (el listener por defecto de Keycloak)
-   - La lista debe quedar: `jboss-logging`, `altana-security-listener`
+1. **Realm Settings** → **Events** tab
+2. Under **Event listeners**: click the field and select `altana-security-listener`
+   - Keep `jboss-logging` as well (Keycloak's default listener)
+   - The list should read: `jboss-logging`, `altana-security-listener`
 3. Click **Save**
 
 ---
 
-### Paso 3 — Habilitar guardado de eventos en la UI (opcional pero recomendado en dev)
+### Step 3 — Enable event persistence in the UI (optional but recommended in dev)
 
-En la misma pestaña **Events**:
+On the same **Events** tab:
 
 **User events:**
-1. Activar **Save events**: ON
-2. En **Saved types**: seleccionar los eventos que quieres guardar en DB:
+1. Enable **Save events**: ON
+2. Under **Saved types**: select the events to persist in the DB:
    - `LOGIN`, `LOGOUT`, `LOGIN_ERROR`, `REGISTER`, `UPDATE_PASSWORD`
-3. **Expiration**: `1` Day (para dev; en prod ajustar según política de retención)
+3. **Expiration**: `1` Day (for dev; adjust per retention policy in prod)
 4. Click **Save**
 
 **Admin events:**
-1. Activar **Save admin events**: ON
-2. Activar **Include representation** (guarda el JSON completo de la operación)
+1. Enable **Save admin events**: ON
+2. Enable **Include representation** (saves the full JSON body of the operation)
 3. Click **Save**
 
-> **Nota:** "Save events" los almacena en la base de datos de Keycloak y los hace visibles en la UI.
-> El `altana-security-listener` escribe en stdout independientemente de este toggle.
-> Son dos mecanismos independientes — puedes tener uno sin el otro.
+> **Note:** "Save events" stores them in the Keycloak database and makes them visible in the UI.
+> The `altana-security-listener` writes to stdout regardless of this toggle.
+> They are two independent mechanisms — you can have one without the other.
 
 ---
 
-### Paso 4 — Ver eventos guardados en la UI
+### Step 4 — View saved events in the UI
 
 **User events:**
-1. Menú lateral → **Events**
-2. Pestaña **User events**
-3. Filtrar por tipo, usuario, IP o fecha
-4. Cada fila muestra: timestamp, tipo, usuario, cliente, IP, detalles
+1. Side menu → **Events**
+2. **User events** tab
+3. Filter by type, user, IP, or date
+4. Each row shows: timestamp, type, user, client, IP, details
 
 **Admin events:**
-1. Menú lateral → **Events**
-2. Pestaña **Admin events**
-3. Cada fila muestra: timestamp, operación (CREATE/UPDATE/DELETE), tipo de recurso, quién lo hizo
+1. Side menu → **Events**
+2. **Admin events** tab
+3. Each row shows: timestamp, operation (CREATE/UPDATE/DELETE), resource type, who did it
 
 ---
 

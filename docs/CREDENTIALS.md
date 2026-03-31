@@ -1,61 +1,61 @@
-# Credenciales del ambiente local
+# Local environment credentials
 
-> Solo para desarrollo local. NUNCA usar estas credenciales en producción.
+> For local development only. NEVER use these credentials in production.
 
 ---
 
 ## Keycloak Admin
 
-| URL | Usuario | Password |
-|-----|---------|----------|
+| URL | Username | Password |
+|-----|----------|----------|
 | http://localhost:8080 | `admin` | `admin` |
 
 ---
 
-## Realm: altana-dev — Usuarios de prueba
+## Realm: altana-dev — Test users
 
-| Username | Password | Roles | tenant_id | user_type | Notas |
+| Username | Password | Roles | tenant_id | user_type | Notes |
 |----------|----------|-------|-----------|-----------|-------|
-| `admin-user` | `Test1234!` | `ROLE_ADMIN` | — | — | Acceso total |
-| `analyst-user` | `Analyst123!` | `ROLE_ANALYST` | toyota | employee | Tiene phone_number para SMS OTP |
-| `john.doe` | `Test1234!` | `ROLE_ANALYST` | toyota | employee | Federado desde toyota-corp |
-| `jane.consumer` | `Test1234!` | `ROLE_VIEWER` | toyota | customer | Usuario B2B2C consumidor final |
+| `admin-user` | `Test1234!` | `ROLE_ADMIN` | — | — | Full access |
+| `analyst-user` | `Analyst123!` | `ROLE_ANALYST` | toyota | employee | Has phone_number for SMS OTP |
+| `john.doe` | `Test1234!` | `ROLE_ANALYST` | toyota | employee | Federated from toyota-corp |
+| `jane.consumer` | `Test1234!` | `ROLE_VIEWER` | toyota | customer | B2B2C end consumer |
 
 ---
 
-## Realm: toyota-corp (IDP externo simulado)
+## Realm: toyota-corp (simulated external IDP)
 
-| Username | Password | Notas |
+| Username | Password | Notes |
 |----------|----------|-------|
-| `john.doe` | `Test1234!` | Se federa a altana-dev via OIDC broker. Password en **toyota-corp**, no en altana-dev. |
-| `jane.consumer` | `Test1234!` | Se federa a altana-dev via OIDC broker. Password en **toyota-corp**, no en altana-dev. |
+| `john.doe` | `Test1234!` | Federated to altana-dev via OIDC broker. Password in **toyota-corp**, not in altana-dev. |
+| `jane.consumer` | `Test1234!` | Federated to altana-dev via OIDC broker. Password in **toyota-corp**, not in altana-dev. |
 
 ---
 
 ## Clients (OAuth2)
 
-| Client ID | Tipo | Secret | Uso |
-|-----------|------|--------|-----|
-| `altana-web` | Público (PKCE) | — | React app, login de usuarios |
-| `supply-chain-backend` | Confidencial | `CHANGE-ME-IN-PRODUCTION` | Spring Boot / FastAPI service account |
-| `python-fastapi` | Confidencial | ver .env | FastAPI resource server |
+| Client ID | Type | Secret | Usage |
+|-----------|------|--------|-------|
+| `altana-web` | Public (PKCE) | — | React app, user login |
+| `supply-chain-backend` | Confidential | `CHANGE-ME-IN-PRODUCTION` | Spring Boot / FastAPI service account |
+| `python-fastapi` | Confidential | see .env | FastAPI resource server |
 
 ---
 
-## Servicios locales
+## Local services
 
-| Servicio | URL | Notas |
-|----------|-----|-------|
+| Service | URL | Notes |
+|---------|-----|-------|
 | Keycloak | http://localhost:8080 | admin / admin |
-| Spring Boot | http://localhost:8081 | Resource Server Java |
-| FastAPI | http://localhost:8081 | Resource Server Python (comparte puerto con Spring, nunca simultáneos) |
+| Spring Boot | http://localhost:8081 | Java Resource Server |
+| FastAPI | http://localhost:8081 | Python Resource Server (shares port with Spring, never run simultaneously) |
 | React | http://localhost:5173 | Frontend PKCE |
-| MailHog UI | http://localhost:8025 | Emails OTP de prueba |
+| MailHog UI | http://localhost:8025 | OTP test emails |
 | PostgreSQL | localhost:5432 | keycloak / keycloak_dev_pass |
 
 ---
 
-## Comandos para levantar todo
+## Commands to start everything
 
 ```bash
 # 1. Keycloak + PostgreSQL + MailHog

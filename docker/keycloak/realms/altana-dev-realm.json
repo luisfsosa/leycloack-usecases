@@ -51,9 +51,9 @@
   ],
   "roles": {
     "realm": [
-      {"name": "ROLE_ADMIN", "description": "Administrador del sistema"},
-      {"name": "ROLE_USER", "description": "Usuario estándar"},
-      {"name": "ROLE_ANALYST", "description": "Analista de supply chain"}
+      {"name": "ROLE_ADMIN", "description": "System administrator"},
+      {"name": "ROLE_USER", "description": "Standard user"},
+      {"name": "ROLE_ANALYST", "description": "Supply chain analyst"}
     ]
   },
   "users": [

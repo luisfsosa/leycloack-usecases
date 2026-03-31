@@ -1,26 +1,26 @@
 /**
  * UC6 — AcceptInvitePage
  *
- * Flujo:
- * 1. Lee ?token=... de la URL (el link que recibió el proveedor por email)
- * 2. Llama a GET /api/invitations/{token} para obtener detalles
- * 3. Muestra: "Toyota te invitó a unirte a Altana como proveedor Tier 2"
- * 4. Dos botones:
- *    - "Crear cuenta" → redirige a Keycloak registration con email pre-llenado
- *    - "Ya tengo cuenta" → flow normal PKCE
+ * Flow:
+ * 1. Reads ?token=... from the URL (the link the supplier received by email)
+ * 2. Calls GET /api/invitations/{token} to fetch details
+ * 3. Shows: "Toyota invited you to join Altana as a Tier 2 Supplier"
+ * 4. Two buttons:
+ *    - "Create account" → redirects to Keycloak registration with email pre-filled
+ *    - "I already have an account" → normal PKCE flow
  *
- * Al volver del callback (isAuthenticated === true):
- * - Si hay pendingInviteToken en sessionStorage → completa el onboarding
- * - Limpia sessionStorage y redirige a /supplier/dashboard
+ * On returning from callback (isAuthenticated === true):
+ * - If pendingInviteToken is in sessionStorage → complete onboarding
+ * - Clear sessionStorage and redirect to /supplier/dashboard
  *
- * APRENDIZAJE: sessionStorage como mecanismo de "handoff" entre páginas.
- * Guardamos el invite token ANTES de salir al callback de Keycloak,
- * y lo consumimos AL VOLVER. Es como dejar una nota para ti mismo.
+ * LEARNING: sessionStorage as a "handoff" mechanism between pages.
+ * We save the invite token BEFORE leaving to the Keycloak callback,
+ * and consume it ON RETURN. Like leaving a note for yourself.
  *
- * ENTREVISTA: "¿Cómo mantienes contexto a través de un redirect OAuth2?"
- * → El parámetro 'state' puede codificar contexto (base64 de un objeto JSON).
- *   Alternativa: sessionStorage (solo mismo tab, se limpia al cerrar).
- *   NUNCA localStorage para datos sensibles — persiste indefinidamente.
+ * INTERVIEW: "How do you maintain context across an OAuth2 redirect?"
+ * → The 'state' parameter can encode context (base64 of a JSON object).
+ *   Alternative: sessionStorage (same tab only, cleared on close).
+ *   NEVER localStorage for sensitive data — it persists indefinitely.
  */
 
 import { useEffect, useState } from 'react';
@@ -33,16 +33,16 @@ export default function AcceptInvitePage() {
   const { isAuthenticated, login, register, getAccessToken } = useAuth();
   const navigate        = useNavigate();
 
-  const [invitation, setInvitation]   = useState(null);   // detalles de la invitación
+  const [invitation, setInvitation]   = useState(null);   // invitation details
   const [error, setError]             = useState(null);
-  const [completing, setCompleting]   = useState(false);  // onboarding en progreso
+  const [completing, setCompleting]   = useState(false);  // onboarding in progress
 
   const token = searchParams.get('token');
 
-  // ── Paso 1: cargar detalles de la invitación ─────────────────────────────
+  // ── Step 1: load invitation details ──────────────────────────────────────
   useEffect(() => {
     if (!token) {
-      setError('No se encontró un token de invitación en la URL.');
+      setError('No invitation token found in the URL.');
       return;
     }
 
@@ -55,7 +55,7 @@ export default function AcceptInvitePage() {
       .catch(err => setError(err.message));
   }, [token]);
 
-  // ── Paso 2: al volver del callback, completar el onboarding ──────────────
+  // ── Step 2: on returning from callback, complete onboarding ──────────────
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -78,12 +78,12 @@ export default function AcceptInvitePage() {
         navigate('/supplier/dashboard');
       })
       .catch(err => {
-        setError(`Error completando onboarding: ${err.message}`);
+        setError(`Error completing onboarding: ${err.message}`);
         setCompleting(false);
       });
   }, [isAuthenticated, getAccessToken, navigate]);
 
-  // ── Handlers de botones ───────────────────────────────────────────────────
+  // ── Button handlers ───────────────────────────────────────────────────────
 
   function handleCreateAccount() {
     sessionStorage.setItem('pendingInviteToken', token);
@@ -100,7 +100,7 @@ export default function AcceptInvitePage() {
   if (completing) {
     return (
       <div style={styles.container}>
-        <p style={styles.subtitle}>Completando onboarding...</p>
+        <p style={styles.subtitle}>Completing onboarding...</p>
       </div>
     );
   }
@@ -108,7 +108,7 @@ export default function AcceptInvitePage() {
   if (error) {
     return (
       <div style={styles.container}>
-        <h2 style={{ color: '#e74c3c' }}>Invitación inválida</h2>
+        <h2 style={{ color: '#e74c3c' }}>Invalid invitation</h2>
         <p style={styles.subtitle}>{error}</p>
       </div>
     );
@@ -117,47 +117,47 @@ export default function AcceptInvitePage() {
   if (!invitation) {
     return (
       <div style={styles.container}>
-        <p style={styles.subtitle}>Cargando invitación...</p>
+        <p style={styles.subtitle}>Loading invitation...</p>
       </div>
     );
   }
 
-  const expiresDate = new Date(invitation.expires_at * 1000).toLocaleDateString('es-ES');
+  const expiresDate = new Date(invitation.expires_at * 1000).toLocaleDateString('en-US');
 
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <div style={styles.badge}>Invitación de proveedor</div>
+        <div style={styles.badge}>Supplier invitation</div>
 
         <h1 style={styles.title}>
-          {invitation.tenant_id.toUpperCase()} te invitó a Altana
+          {invitation.tenant_id.toUpperCase()} invited you to Altana
         </h1>
 
         <p style={styles.subtitle}>
-          Únete como <strong>Proveedor Tier {invitation.supplier_tier}</strong> en la
-          plataforma de supply chain de {invitation.tenant_id}.
+          Join as a <strong>Tier {invitation.supplier_tier} Supplier</strong> on the
+          supply chain platform of {invitation.tenant_id}.
         </p>
 
         <div style={styles.infoBox}>
-          <InfoRow label="Para" value={invitation.invited_email} />
-          <InfoRow label="Invitado por" value={invitation.invited_by} />
-          <InfoRow label="Empresa" value={invitation.tenant_id.toUpperCase()} />
-          <InfoRow label="Tier de proveedor" value={`Tier ${invitation.supplier_tier}`} />
-          <InfoRow label="Expira" value={expiresDate} />
+          <InfoRow label="To"              value={invitation.invited_email} />
+          <InfoRow label="Invited by"      value={invitation.invited_by} />
+          <InfoRow label="Company"         value={invitation.tenant_id.toUpperCase()} />
+          <InfoRow label="Supplier tier"   value={`Tier ${invitation.supplier_tier}`} />
+          <InfoRow label="Expires"         value={expiresDate} />
         </div>
 
         <div style={styles.actions}>
           <button style={styles.primaryBtn} onClick={handleCreateAccount}>
-            Crear cuenta nueva
+            Create new account
           </button>
           <button style={styles.secondaryBtn} onClick={handleLogin}>
-            Ya tengo cuenta — Iniciar sesión
+            I already have an account — Sign in
           </button>
         </div>
 
         <p style={styles.footer}>
-          Al crear una cuenta aceptas los términos de uso de Altana.
-          Tu email será verificado por Keycloak.
+          By creating an account you accept Altana's terms of use.
+          Your email will be verified by Keycloak.
         </p>
       </div>
     </div>
